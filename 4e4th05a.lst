@@ -1,0 +1,1136 @@
+; 4e4th Version 0.5a for the Texas Intruments MSP430G2553 LaunchPad
+; ----------------------------------------------------------------------
+; CamelForth for the Texas Instruments MSP430 
+; (c) 2009,2014 Bradford J. Rodriguez.
+;
+; This program is free software; you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation; either version 3 of the License, or
+; (at your option) any later version.
+;
+; This program is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+; GNU General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;
+; Commercial inquiries should be directed to the author at 
+; 115 First St., #105, Collingwood, Ontario L9Y 4W3 Canada
+; or via email to bj@camelforth.com
+; ----------------------------------------------------------------------
+; 4e4th-0.5a.asm - build file for naken_asm
+; M. Kalus 29. Apr 2018
+; used to be: camel430g2553.asm - build file for naken_asm
+; B. Rodriguez  1 Mar 2014
+
+; Revision History
+; 29 apr 2018 mk - modified to make 4e4th. find ;mk in files to see all modified lines.
+;  1 mar 2014 bjr - adapted for naken_asm from init430g2553.s43.
+; 27 nov 2012 bjr - moved UP to just below UAREA
+
+.msp430
+.include "msp430g2553.inc"  ; MCU-specific register equates
+.include "itc430.inc"       ; registers, macros, and header structure
+
+; ----------------------------------------------------------------------
+; MEMORY MAP of the MSP430G2553
+; 16KB flash ROM, 0.5KB RAM
+;
+; 0000-01FF = peripherals
+; 0200-03FF = 0.5KB RAM
+; 0400-0FFF = unused
+; 1000-10FF = 256B information memory
+; C000-FFFF = 16KB flash ROM 
+;   FFE0-FFFF = interrupt vectors
+;
+; CamelForth REVISED memory map (puts UAREA last, before dictionary):
+;   UAREA-128h  HOLD area, 20 bytes, grows down from end
+;   UAREA-114h  PAD buffer, 82 bytes, must follow HOLD area
+;   UAREA-114h  TIB Terminal Input Buffer, 82 bytes, overlaps PAD
+;   UAREA-0C2h  Parameter stack, 96 bytes, grows down from end
+;   UAREA-62h   Return stack, 96 bytes, grows down from end
+;   UP          User Pointer, 2 bytes
+;   UAREA       User area, 32 bytes
+;   UAREA+20h   RAM variables space, 96 bytes
+;   UAREA+80h   start of Forth dictionary, 88 bytes available
+; The User Area and RAM Variables space will be restored from 
+; Info ROM, so they should total 128 bytes.
+;
+; Note all must be word-aligned.
+; See also the definitions of U0, S0, and R0 in the "system variables &
+; constants" area.  A task w/o terminal input requires 200h bytes.
+; Double all except TIB and PAD for 32-bit CPUs.
+;
+; Because the MSP430G2553 is resource-limited, we use the Info Flash
+; to hold user interrupt vectors and reset data.
+;   INFO+000h (INFOD):  RAM save area
+;   INFO+040h (INFOC):  RAM save area
+;   INFO+080h (INFOB):  user interrupt vectors
+;   INFO+0C0h (INFOA):  configuration data - do not use
+
+UAREA_SIZE equ 16         ; cells
+VARS_SIZE equ 48          ; cells
+RSTACK_SIZE equ 48        ; cells
+PSTACK_SIZE equ 48        ; cells
+; following only required for terminal tasks
+HOLD_SIZE equ 20          ; bytes (must be even)
+PAD_SIZE equ 0            ; bytes (must be even)
+TIB_SIZE equ 82           ; bytes (must be even)
+
+INFO_SIZE equ (UAREA_SIZE+VARS_SIZE)*2    ; bytes
+
+; FLASH MEMORY LIMITS
+; for Flash memory operations - this includes information and main
+; ROM, but not the main ROM used by the kernel (above E000h)
+INFOSTART  equ 01000h
+INFOEND    equ 010BFh     ; do not allow config flash to be erased
+FLASHSTART equ 0C000h
+FLASHEND   equ 0DFFFh
+MAINSEG    equ 512
+INFOSEG    equ 64
+
+
+; ----------------------------------------------------------------------
+; RAM DATA AREAS 
+
+        .org 0200h      ; start of RAM
+
+        DS8    HOLD_SIZE
+; HOLDAREA: ; end of hold area - hold area grows down from PAD
+PADAREA: DS8   PAD_SIZE             ; must follow HOLDAREA
+TIBAREA: DS8    TIB_SIZE            ; Terminal Input Buffer
+
+LSTACK: DS16    PSTACK_SIZE   ; leave stack grows up into PSTACK area
+PSTACK: ; end of parameter stack area
+        DS16    RSTACK_SIZE
+RSTACK: ; end of return stack area
+
+UP:     DS16    1                   ; User Pointer
+
+UAREA:  DS16    UAREA_SIZE
+
+RAMDICT: DS16   VARS_SIZE     ; 96 bytes for variables
+; ROMDICT:          ; all RAM following is program dictionary
+ROMDICT EQU     FLASHSTART  ; to use Flash ROM for program dictionary
+
+; ----------------------------------------------------------------------
+; DATA FLASH AREAS 
+
+        .org 1000h      ; start of info Flash
+
+        ; 128 bytes at start of Info area, for saved User Area & variables
+USAVE:  DS16  UAREA_SIZE
+        DS16  VARS_SIZE
+
+.if $>1080h
+.error "SAVE area does not fit in Info Flash"
+.endif
+
+; ----------------------------------------------------------------------
+; SOURCE FILES
+
+.include "430g2553vecs.asm" ; note: sets .org for vector tables
+        .org 0E000h         ; start address of CamelForth kernel
+.include "itc430core.asm"   ; code primitives
+.include "430g2553io.asm"
+.include "itc430deps.asm"
+.include "itc430hilvl-mk.asm"
+.include "itc430extras.asm"
+.include "itc430irpts.asm"
+.include "430g2553install.asm"
+.include "430g2553save.asm"
+
+INITIP   equ COLD+2         ; default coldstart word (high-level)
+.include "430g2553init.asm"
+
+; ----------------------------------------------------------------------
+; END OF FORTH KERNEL
+
+.set lastword = link           ; last word in dictionary
+ENDE:
+.if $>intvecs
+.error "Forth does not fit in DataFlash"
+.endif
+
+        END
+data sections:
+0200: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0210: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0220: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0230: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0240: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0250: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0260: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0270: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0280: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0290: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+02a0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+02b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+02c0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+02d0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+02e0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+02f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0300: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0310: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0320: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0330: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0340: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0350: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0360: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0370: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0380: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+0390: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+03a0: 00 00 00 00 00 00 00 00                          ........
+1000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+1010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+1020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+1030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+1040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+1050: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+1060: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+1070: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+e000: 00 00 ff 07 45 58 45 43 55 54 45                 ....EXECUTE
+e00c: 0e e0                                            ..
+e014: 03 e0 ff 03 6c 69 74                             ....lit
+e01c: 1e e0                                            ..
+e02a: 17 e0 ff 04 45 58 49 54 34 e0                    ....EXIT4.
+e042: 2d e0 ff 08 56 41 52 49 41 42 4c 45 3a e0 a0 f5  -...VARIABLE:...
+e052: 20 e8 48 f0 32 e0 45 e0 ff 08 43 4f 4e 53 54 41   .H.2.E...CONSTA
+e062: 4e 54 3a e0 8a f5 a6 f0 bc f5                    NT:.......
+e078: 5b e0 ff 09 32 43 4f 4e 53 54 41 4e 54           [...2CONSTANT
+e086: 3a e0 8a f5 a6 f0 a6 f0 bc f5                    :.........
+e0ac: 7b e0 ff 04 55 53 45 52 3a e0 8a f5 a6 f0 bc f5  ....USER:.......
+e0e4: af e0 ff 03 44 55 50                             ....DUP
+e0ec: ee e0                                            ..
+e0f8: e7 e0 ff 04 3f 44 55 50 02 e1                    ....?DUP..
+e10a: fb e0 ff 04 44 52 4f 50 14 e1                    ....DROP..
+e11a: 0d e1 ff 04 53 57 41 50 24 e1                    ....SWAP$.
+e130: 1d e1 ff 04 4f 56 45 52 3a e1                    ....OVER:.
+e148: 33 e1 ff 03 52 4f 54                             3...ROT
+e150: 52 e1                                            R.
+e164: 4b e1 ff 03 4e 49 50                             K...NIP
+e16c: 6e e1                                            n.
+e174: 67 e1 ff 02 3e 52 7c e1                          g...>R..
+e184: 77 e1 ff 02 52 3e 8c e1                          w...R>..
+e198: 87 e1 ff 02 52 40 a0 e1                          ....R@..
+e1ac: 9b e1 ff 03 53 50 40                             ....SP@
+e1b4: b6 e1                                            ..
+e1c2: af e1 ff 03 53 50 21                             ....SP!
+e1ca: cc e1                                            ..
+e1d4: c5 e1 ff 03 52 50 40                             ....RP@
+e1dc: de e1                                            ..
+e1ea: d7 e1 ff 03 52 50 21                             ....RP!
+e1f2: f4 e1                                            ..
+e1fc: ed e1 ff 04 54 55 43 4b 3a e0 22 e1 38 e1 32 e0  ....TUCK:.".8.2.
+e20c: ff e1 ff 01 40                                   ....@
+e212: 14 e2                                            ..
+e21a: 0f e2 ff 01 21                                   ....!
+e220: 22 e2                                            ".
+e22c: 1d e2 ff 02 43 40 34 e2                          ....C@4.
+e23a: 2f e2 ff 02 43 21 42 e2                          /...C!B.
+e24e: 3d e2 ff 07 46 4c 45 52 41 53 45                 =...FLERASE
+e25a: 5c e2                                            \.
+e2b8: 51 e2 ff 02 49 21 c0 e2                          Q...I!..
+e308: bb e2 ff 03 49 43 21                             ....IC!
+e310: 12 e3                                            ..
+e352: 0b e3 ff 02 49 40 14 e2 55 e3 ff 03 49 43 40     ....I@..U...IC@
+e362: 34 e2 5d e3 ff 04 44 2d 3e 49 6e e3              4.]...D->In.
+e3bc: 67 e3 ff 01 2b                                   g...+
+e3c2: c4 e3                                            ..
+e3ca: bf e3 ff 02 2b 21 d2 e3                          ....+!..
+e3dc: cd e3 ff 02 4d 2b e4 e3                          ....M+..
+e3f2: df e3 ff 01 2d                                   ....-
+e3f8: fa e3                                            ..
+e404: f5 e3 ff 03 41 4e 44                             ....AND
+e40c: 0e e4                                            ..
+e414: 07 e4 ff 02 4f 52 1c e4                          ....OR..
+e422: 17 e4 ff 03 58 4f 52                             ....XOR
+e42a: 2c e4                                            ,.
+e432: 25 e4 ff 06 49 4e 56 45 52 54 3e e4              %...INVERT>.
+e444: 35 e4 ff 06 4e 45 47 41 54 45 50 e4              5...NEGATEP.
+e458: 47 e4 ff 02 31 2b 60 e4                          G...1+`.
+e466: 5b e4 ff 02 31 2d 6e e4                          [...1-n.
+e474: 69 e4 ff 02 3e 3c 7c e4                          i...><..
+e482: 77 e4 ff 02 32 2a 8a e4                          w...2*..
+e490: 85 e4 ff 02 32 2f 98 e4                          ....2/..
+e49e: 93 e4 ff 06 4c 53 48 49 46 54 aa e4              ....LSHIFT..
+e4be: a1 e4 ff 06 52 53 48 49 46 54 ca e4              ....RSHIFT..
+e4e0: c1 e4 ff 02 30 3d e8 e4                          ....0=..
+e4f0: e3 e4 ff 02 30 3c f8 e4                          ....0<..
+e502: f3 e4 ff 01 3d                                   ....=
+e508: 0a e5                                            ..
+e516: 05 e5 ff 02 3c 3e 3a e0 08 e5 e6 e4 32 e0 19 e5  ....<>:.....2...
+e526: ff 01 3c                                         ..<
+e52a: 2c e5                                            ,.
+e538: 27 e5 ff 01 3e                                   '...>
+e53e: 3a e0 22 e1 2a e5 32 e0 3b e5 ff 02 55 3c 4e e5  :.".*.2.;...U<N.
+e556: 49 e5 ff 02 55 3e 3a e0 22 e1 4c e5 32 e0 59 e5  I...U>:.".L.2.Y.
+e566: ff 06 62 72 61 6e 63 68 70 e5                    ..branchp.
+e576: 67 e5 ff 07 3f 62 72 61 6e 63 68                 g...?branch
+e582: 84 e5                                            ..
+e590: 79 e5 ff 04 28 64 6f 29 9a e5                    ....(do)..
+e5b4: 93 e5 ff 06 28 6c 6f 6f 70 29 c0 e5              ....(loop)..
+e5d2: b7 e5 ff 07 28 2b 6c 6f 6f 70 29                 ....(+loop)
+e5de: e0 e5                                            ..
+e5f4: d5 e5 ff 01 49                                   ....I
+e5fa: fc e5                                            ..
+e60a: f7 e5 ff 01 4a                                   ....J
+e610: 12 e6                                            ..
+e622: 0d e6 ff 06 55 4e 4c 4f 4f 50 2e e6              ....UNLOOP..
+e636: 25 e6 ff 03 55 4d 2a                             %...UM*
+e63e: 40 e6                                            @.
+e664: 39 e6 ff 06 55 4d 2f 4d 4f 44 70 e6              9...UM/MODp.
+e6a0: 67 e6 ff 04 46 49 4c 4c aa e6                    g...FILL..
+e6c2: a3 e6 ff 05 43 4d 4f 56 45                       ....CMOVE
+e6cc: ce e6                                            ..
+e6e6: c5 e6 ff 06 43 4d 4f 56 45 3e f2 e6              ....CMOVE>..
+e710: e9 e6 ff 04 49 2d 3e 44 ce e6 13 e7 ff 04 53 4b  ....I->D......SK
+e720: 49 50 24 e7                                      IP$.
+e740: 1d e7 ff 04 53 43 41 4e 4a e7                    ....SCANJ.
+e766: 43 e7 ff 02 53 3d 6e e7                          C...S=n.
+e78e: 69 e7 ff 02 4e 3d 6e e7 91 e7 ff 04 45 4d 49 54  i...N=n.....EMIT
+e79e: a0 e7                                            ..
+e7b0: 99 e7 ff 03 4b 45 59                             ....KEY
+e7b8: ba e7                                            ..
+e7ce: b3 e7 ff 04 4b 45 59 3f d8 e7                    ....KEY?..
+e7e6: d1 e7 ff 05 41 4c 49 47 4e                       ....ALIGN
+e7f0: 3a e0 86 f0 1c e0 01 00 0c e4 98 f0 32 e0 e9 e7  :...........2...
+e800: ff 07 41 4c 49 47 4e 45 44                       ..ALIGNED
+e80a: 3a e0 ec e0 1c e0 01 00 0c e4 c2 e3 32 e0 01 e8  :...........2...
+e81a: ff 04 43 45 4c 4c 6c e0 02 00 1b e8 ff 05 43 45  ..CELLl.......CE
+e82a: 4c 4c 2b                                         LL+
+e82e: 30 e8                                            0.
+e834: 27 e8 ff 05 43 45 4c 4c 53                       '...CELLS
+e83e: 8a e4 37 e8 ff 05 43 48 41 52 2b                 ..7...CHAR+
+e84a: 60 e4 43 e8 ff 05 43 48 41 52 53                 `.C...CHARS
+e856: ca e7 4f e8 ff 05 3e 42 4f 44 59                 ..O...>BODY
+e862: 30 e8 5b e8 ff 08 43 4f 4d 50 49 4c 45 2c cc e0  0.[...COMPILE,..
+e872: a6 f0 67 e8 ff 03 21 43 46                       ..g...!CF
+e87c: cc e0 be e2 77 e8 ff 03 2c 43 46                 ....w...,CF
+e888: 3a e0 86 f0 7c e8 1c e0 02 00 98 f0 32 e0 83 e8  :...........2...
+e898: ff 05 2c 43 41 4c 4c                             ..,CALL
+e8a0: 3a e0 1c e0 b0 12 a6 f0 a6 f0 32 e0 99 e8 ff 04  :.........2.....
+e8b0: 2c 4a 4d 50 3a e0 1c e0 30 40 a6 f0 a6 f0 32 e0  ,JMP:...0@....2.
+e8c0: af e8 ff 06 21 43 4f 4c 4f 4e 3a e0 1c e0 fe ff  ....!COLON:.....
+e8d0: 98 f0 1c e0 3a e0 88 e8 32 e0 c3 e8 ff 05 2c 45  ....:...2.....,E
+e8e0: 58 49 54                                         XIT
+e8e4: 3a e0 1c e0 32 e0 70 e8 32 e0 dd e8 ff 07 2c 42  :...2.p.2.....,B
+e8f4: 52 41 4e 43 48                                   RANCH
+e8fa: cc e0 a6 f0 f1 e8 ff 05 2c 44 45 53 54           ........,DEST
+e908: 3a e0 86 f0 f8 e3 a6 f0 32 e0 01 e9 ff 05 21 44  :.......2.....!D
+e918: 45 53 54                                         EST
+e91c: 3a e0 04 e2 f8 e3 22 e1 be e2 32 e0 15 e9 ff 05  :....."...2.....
+e92c: 2c 4e 4f 4e 45                                   ,NONE
+e932: 3a e0 20 e8 98 f0 32 e0 2b e9 ff 02 55 30 bc e0  :. ...2.+...U0..
+e942: 00 00 3d e9 ff 03 3e 49 4e                       ..=...>IN
+e94c: bc e0 02 00 47 e9 ff 04 42 41 53 45 bc e0 04 00  ....G...BASE....
+e95c: 53 e9 ff 05 53 54 41 54 45                       S...STATE
+e966: bc e0 06 00 5f e9 ff 02 44 50 bc e0 08 00 6d e9  ...._...DP....m.
+e976: ff 07 27 53 4f 55 52 43 45                       ..'SOURCE
+e980: bc e0 0a 00 77 e9 ff 06 4c 41 54 45 53 54 bc e0  ....w...LATEST..
+e990: 0e 00 87 e9 ff 02 48 50 bc e0 10 00 95 e9 ff 02  ......HP........
+e9a0: 4c 50 bc e0 12 00 9f e9 ff 03 49 44 50           LP........IDP
+e9ae: bc e0 14 00 a9 e9 ff 06 4e 45 57 45 53 54 bc e0  ........NEWEST..
+e9be: 16 00 b5 e9 ff 07 58 4f 4e 2f 4f 46 46           ......XON/OFF
+e9cc: bc e0 18 00 c3 e9 ff 03 50 41 44                 ........PAD
+e9d8: bc e0 ec fe d3 e9 ff 02 4c 30 bc e0 3e ff df e9  ........L0..>...
+e9e8: ff 02 52 30 bc e0 fe ff e9 e9 ff 02 53 30 bc e0  ..R0........S0..
+e9f8: 9e ff f3 e9 ff 03 54 49 42                       ......TIB
+ea02: bc e0 ec fe fd e9 ff 07 54 49 42 53 49 5a 45     ........TIBSIZE
+ea12: 6c e0 50 00 09 ea ff 02 42 4c 6c e0 20 00 19 ea  l.P.....BLl. ...
+ea22: ff 05 55 49 4e 49 54                             ..UINIT
+ea2a: a0 e0 00 00 00 00 0a 00 00 00 48 03 00 00 00 00  ..........H.....
+ea3a: 5d fd 00 00 00 00 00 c0 00 00 00 00 00 00 00 00  ]...............
+ea4a: 00 00                                            ..
+ea88: 23 ea ff 05 23 49 4e 49 54                       #...#INIT
+ea92: 6c e0 5c 00 8b ea ff 03 53 3e 44                 l.\.....S>D
+ea9e: 3a e0 ec e0 f6 e4 32 e0 99 ea ff 07 3f 4e 45 47  :.....2.....?NEG
+eaae: 41 54 45                                         ATE
+eab2: 3a e0 f6 e4 82 e5 04 00 4e e4 32 e0 a9 ea ff 03  :.......N.2.....
+eac2: 41 42 53                                         ABS
+eac6: 3a e0 ec e0 b2 ea 32 e0 c1 ea ff 07 44 4e 45 47  :.....2.....DNEG
+ead6: 41 54 45                                         ATE
+eada: 3a e0 22 e1 3c e4 22 e1 3c e4 1c e0 01 00 e2 e3  :.".<.".<.......
+eaea: 32 e0 d1 ea ff 08 3f 44 4e 45 47 41 54 45 3a e0  2.....?DNEGATE:.
+eafa: f6 e4 82 e5 04 00 da ea 32 e0 ef ea ff 04 44 41  ........2.....DA
+eb0a: 42 53 3a e0 ec e0 f8 ea 32 e0 07 eb ff 02 4d 2a  BS:.....2.....M*
+eb1a: 3a e0 7e ec 2a e4 7a e1 22 e1 c6 ea 22 e1 c6 ea  :...*..."..."...
+eb2a: 3e e6 8a e1 f8 ea 32 e0 17 eb ff 06 53 4d 2f 52  >.....2.....SM/R
+eb3a: 45 4d 3a e0 7e ec 2a e4 7a e1 38 e1 7a e1 c6 ea  EM:...*...8.....
+eb4a: 7a e1 0c eb 8a e1 6e e6 22 e1 8a e1 b2 ea 22 e1  ......n.".....".
+eb5a: 8a e1 b2 ea 32 e0 35 eb ff 06 46 4d 2f 4d 4f 44  ....2.5...FM/MOD
+eb6a: 3a e0 ec e0 7a e1 7e ec 2a e4 7a e1 7a e1 0c eb  :.......*.......
+eb7a: 9e e1 c6 ea 6e e6 22 e1 8a e1 b2 ea 22 e1 8a e1  ....n."....."...
+eb8a: f6 e4 82 e5 14 00 4e e4 38 e1 82 e5 0c 00 9e e1  ......N.8.......
+eb9a: 50 e1 f8 e3 22 e1 6c e4 8a e1 12 e1 32 e0 63 eb  P...".l.....2.c.
+ebaa: ff 01 2a                                         ..*
+ebae: 3a e0 1a eb 12 e1 32 e0 ab eb ff 04 2f 4d 4f 44  :.....2...../MOD
+ebbe: 3a e0 7a e1 9e ea 8a e1 6a eb 32 e0 b9 eb ff 01  :.......j.2.....
+ebce: 2f                                               /
+ebd0: 3a e0 be eb 6c e1 32 e0 cd eb ff 03 4d 4f 44     :...l.2.....MOD
+ebe0: 3a e0 be eb 12 e1 32 e0 db eb ff 05 2a 2f 4d 4f  :.....2.....*/MO
+ebf0: 44                                               D
+ebf2: 3a e0 7a e1 1a eb 8a e1 6a eb 32 e0 eb eb ff 02  :.......j.2.....
+ec02: 2a 2f 3a e0 f2 eb 6c e1 32 e0 01 ec ff 03 4d 41  */:...l.2.....MA
+ec12: 58                                               X
+ec14: 3a e0 7e ec 2a e5 82 e5 04 00 22 e1 12 e1 32 e0  :...*....."...2.
+ec24: 0f ec ff 03 4d 49 4e                             ....MIN
+ec2c: 3a e0 7e ec 3e e5 82 e5 04 00 22 e1 12 e1 32 e0  :...>....."...2.
+ec3c: 27 ec ff 02 32 40 3a e0 ec e0 2e e8 12 e2 22 e1  '...2@:.......".
+ec4c: 12 e2 32 e0 3f ec ff 02 32 21 3a e0 22 e1 38 e1  ..2.?...2!:.".8.
+ec5c: 20 e2 2e e8 20 e2 32 e0 53 ec ff 05 32 44 52 4f   ... .2.S...2DRO
+ec6c: 50                                               P
+ec6e: 3a e0 12 e1 12 e1 32 e0 67 ec ff 04 32 44 55 50  :.....2.g...2DUP
+ec7e: 3a e0 38 e1 38 e1 32 e0 79 ec ff 05 32 53 57 41  :.8.8.2.....2SWA
+ec8e: 50                                               P
+ec90: 3a e0 50 e1 7a e1 50 e1 8a e1 32 e0 89 ec ff 05  :.P...P...2.....
+eca0: 32 4f 56 45 52                                   2OVER
+eca6: 3a e0 7a e1 7a e1 7e ec 8a e1 8a e1 90 ec 32 e0  :.............2.
+ecb6: 9f ec ff 05 43 4f 55 4e 54                       ....COUNT
+ecc0: 3a e0 ec e0 4a e8 22 e1 32 e2 32 e0 b9 ec ff 02  :...J.".2.2.....
+ecd0: 43 52 3a e0 1c e0 0d 00 9e e7 1c e0 0a 00 9e e7  CR:.............
+ece0: 32 e0 cf ec ff 05 53 50 41 43 45                 2.....SPACE
+ecec: 3a e0 1c ea 9e e7 32 e0 e5 ec ff 06 53 50 41 43  :.....2.....SPAC
+ecfc: 45 53 3a e0 ec e0 82 e5 0a 00 ec ec 6c e4 6e e5  ES:.........l.n.
+ed0c: f4 ff 12 e1 32 e0 f7 ec ff 04 55 4d 49 4e 3a e0  ....2.....UMIN:.
+ed1c: 7e ec 5c e5 82 e5 04 00 22 e1 12 e1 32 e0 15 ed  ..\....."...2...
+ed2c: ff 04 55 4d 41 58 3a e0 7e ec 4c e5 82 e5 04 00  ..UMAX:...L.....
+ed3c: 22 e1 12 e1 32 e0 2d ed ff 06 41 43 43 45 50 54  "...2.-...ACCEPT
+ed4c: 3a e0 38 e1 c2 e3 6c e4 38 e1 b8 e7 ec e0 1c e0  :.8...l.8.......
+ed5c: 0d 00 1c e5 82 e5 38 00 ec e0 9e e7 ec e0 1c e0  ......8.........
+ed6c: 08 00 08 e5 82 e5 1a 00 12 e1 6c e4 7a e1 38 e1  ..........l...8.
+ed7c: 8a e1 32 ed ec ec 1c e0 08 00 9e e7 6e e5 0c 00  ..2.........n...
+ed8c: 38 e1 40 e2 5e e4 38 e1 1a ed 6e e5 be ff 12 e1  8.@.^.8...n.....
+ed9c: 6c e1 22 e1 f8 e3 32 e0 45 ed ff 04 54 59 50 45  l."...2.E...TYPE
+edac: 3a e0 00 e1 82 e5 18 00 38 e1 c2 e3 22 e1 98 e5  :.......8..."...
+edbc: fa e5 32 e2 9e e7 be e5 f8 ff 6e e5 04 00 12 e1  ..2.......n.....
+edcc: 32 e0 a7 ed ff 06 49 43 4f 55 4e 54 3a e0 ec e0  2.....ICOUNT:...
+eddc: 4a e8 22 e1 62 e3 32 e0 d1 ed ff 05 49 54 59 50  J.".b.2.....ITYP
+edec: 45                                               E
+edee: 3a e0 00 e1 82 e5 18 00 38 e1 c2 e3 22 e1 98 e5  :.......8..."...
+edfe: fa e5 62 e3 9e e7 be e5 f8 ff 6e e5 04 00 12 e1  ..b.......n.....
+ee0e: 32 e0 e7 ed ff 05 28 49 53 22 29                 2.....(IS")
+ee1a: 3a e0 8a e1 d8 ed 7e ec c2 e3 0a e8 7a e1 32 e0  :.............2.
+ee2a: 13 ee ff 04 28 53 22 29 3a e0 9e e1 58 e3 8a e1  ....(S"):...X...
+ee3a: 2e e8 ec e0 62 e3 4a e8 7e ec c2 e3 0a e8 7a e1  ....b.J.........
+ee4a: 7a e1 38 e1 8a e1 18 e7 c0 ec 32 e0 2d ee fe 03  ..8.......2.-...
+ee5a: 49 53 22                                         IS"
+ee5e: 3a e0 1c e0 1a ee 70 e8 1c e0 22 00 5c f1 ec e0  :.....p...".\...
+ee6e: 7a e1 be f0 86 f0 9e e1 6c e3 8a e1 98 f0 f0 e7  ........l.......
+ee7e: 32 e0 59 ee fe 02 53 22 3a e0 1c e0 32 ee 70 e8  2.Y...S":...2.p.
+ee8e: 36 f0 a6 f0 1c e0 22 00 5c f1 ec e0 7a e1 be f0  6.....".\.......
+ee9e: 86 f0 9e e1 6c e3 9e e1 5e e4 48 f0 8a e1 98 f0  ....l...^.H.....
+eeae: f0 e7 32 e0 83 ee fe 02 2e 22 3a e0 5e ee 1c e0  ..2......":.^...
+eebe: ee ed 70 e8 32 e0 b5 ee ff 05 49 57 4f 52 44     ..p.2.....IWORD
+eece: 3a e0 8a f1 66 f2 86 f0 04 e2 38 e1 32 e2 4a e8  :...f.....8.2.J.
+eede: 6c e3 32 e0 c7 ee ff 06 55 44 2f 4d 4f 44 3a e0  l.2.....UD/MOD:.
+eeee: 7a e1 1c e0 00 00 9e e1 6e e6 50 e1 50 e1 8a e1  ........n.P.P...
+eefe: 6e e6 50 e1 32 e0 e5 ee ff 03 55 44 2a           n.P.2.....UD*
+ef0c: 3a e0 ec e0 7a e1 3e e6 12 e1 22 e1 8a e1 3e e6  :.....>..."...>.
+ef1c: 50 e1 c2 e3 32 e0 07 ef ff 04 48 4f 4c 44 3a e0  P...2.....HOLD:.
+ef2c: 1c e0 ff ff 98 e9 d0 e3 98 e9 12 e2 40 e2 32 e0  ............@.2.
+ef3c: 25 ef ff 02 3c 23 3a e0 d8 e9 98 e9 20 e2 32 e0  %...<#:..... .2.
+ef4c: 3f ef ff 06 3e 44 49 47 49 54 3a e0 ec e0 1c e0  ?...>DIGIT:.....
+ef5c: 09 00 3e e5 1c e0 07 00 0c e4 c2 e3 1c e0 30 00  ..>...........0.
+ef6c: c2 e3 32 e0 4f ef ff 01 23                       ..2.O...#
+ef76: 3a e0 58 e9 12 e2 ec ee 50 e1 56 ef 2a ef 32 e0  :.X.....P.V.*.2.
+ef86: 73 ef ff 02 23 53 3a e0 76 ef 7e ec 1a e4 e6 e4  s...#S:.v.......
+ef96: 82 e5 f6 ff 32 e0 89 ef ff 02 23 3e 3a e0 6e ec  ....2.....#>:.n.
+efa6: 98 e9 12 e2 d8 e9 38 e1 f8 e3 32 e0 9f ef ff 04  ......8...2.....
+efb6: 53 49 47 4e 3a e0 f6 e4 82 e5 08 00 1c e0 2d 00  SIGN:.........-.
+efc6: 2a ef 32 e0 b5 ef ff 02 55 2e 3a e0 42 ef 1c e0  *.2.....U.:.B...
+efd6: 00 00 8c ef a2 ef ac ed ec ec 32 e0 cd ef ff 01  ..........2.....
+efe6: 2e                                               .
+efe8: 3a e0 42 ef ec e0 c6 ea 1c e0 00 00 8c ef 50 e1  :.B...........P.
+eff8: ba ef a2 ef ac ed ec ec 32 e0 e5 ef ff 07 44 45  ........2.....DE
+f008: 43 49 4d 41 4c                                   CIMAL
+f00e: 3a e0 1c e0 0a 00 58 e9 20 e2 32 e0 05 f0 ff 03  :.....X. .2.....
+f01e: 48 45 58                                         HEX
+f022: 3a e0 1c e0 10 00 58 e9 20 e2 32 e0 1d f0 ff 04  :.....X. .2.....
+f032: 48 45 52 45 3a e0 70 e9 12 e2 32 e0 31 f0 ff 05  HERE:.p...2.1...
+f042: 41 4c 4c 4f 54                                   ALLOT
+f048: 3a e0 70 e9 d0 e3 32 e0 41 f0 ff 01 2c           :.p...2.A...,
+f056: 3a e0 36 f0 20 e2 1c e0 01 00 3e e8 48 f0 32 e0  :.6. .....>.H.2.
+f066: 53 f0 ff 02 43 2c 3a e0 36 f0 40 e2 1c e0 01 00  S...C,:.6.@.....
+f076: 56 e8 48 f0 32 e0 69 f0 ff 05 49 48 45 52 45     V.H.2.i...IHERE
+f086: 3a e0 ae e9 12 e2 32 e0 7f f0 ff 06 49 41 4c 4c  :.....2.....IALL
+f096: 4f 54 3a e0 ae e9 d0 e3 32 e0 91 f0 ff 02 49 2c  OT:.....2.....I,
+f0a6: 3a e0 86 f0 be e2 1c e0 01 00 3e e8 98 f0 32 e0  :.........>...2.
+f0b6: a3 f0 ff 03 49 43 2c                             ....IC,
+f0be: 3a e0 86 f0 10 e3 1c e0 01 00 56 e8 98 f0 32 e0  :.........V...2.
+f0ce: b9 f0 ff 06 3f 53 54 41 43 4b 3a e0 80 f8 f6 e4  ....?STACK:.....
+f0de: 1a ee 03 53 55 46 d4 f4 32 e0 d1 f0 ff 06 53 4f  ...SUF..2.....SO
+f0ee: 55 52 43 45 3a e0 80 e9 42 ec 32 e0 eb f0 ff 07  URCE:...B.2.....
+f0fe: 2f 53 54 52 49 4e 47                             /STRING
+f106: 3a e0 50 e1 38 e1 c2 e3 50 e1 50 e1 f8 e3 32 e0  :.P.8...P.P...2.
+f116: fd f0 ff 08 3e 43 4f 55 4e 54 45 44 3a e0 7e ec  ....>COUNTED:...
+f126: 40 e2 4a e8 22 e1 cc e6 32 e0 19 f1 ff 06 41 44  @.J."...2.....AD
+f136: 52 3e 49 4e 3a e0 f2 f0 50 e1 50 e1 f8 e3 2c ec  R>IN:...P.P...,.
+f146: 1c e0 00 00 14 ec 4c e9 20 e2 32 e0 33 f1 ff 05  ......L. .2.3...
+f156: 50 41 52 53 45                                   PARSE
+f15c: 3a e0 f2 f0 4c e9 12 e2 06 f1 38 e1 7a e1 50 e1  :...L.....8...P.
+f16c: 48 e7 38 e1 22 e1 82 e5 04 00 5e e4 3a f1 8a e1  H.8.".....^.:...
+f17c: 04 e2 f8 e3 32 e0 55 f1 ff 04 57 4f 52 44 3a e0  ....2.U...WORD:.
+f18c: ec e0 f2 f0 4c e9 12 e2 06 f1 50 e1 22 e7 12 e1  ....L.....P."...
+f19c: 3a f1 5c f1 36 f0 22 f1 36 f0 1c ea 38 e1 c0 ec  :.\.6.".6...8...
+f1ac: c2 e3 40 e2 32 e0 85 f1 ff 07 4e 46 41 3e 4c 46  ..@.2.....NFA>LF
+f1bc: 41                                               A
+f1be: 3a e0 1c e0 03 00 f8 e3 32 e0 b5 f1 ff 07 4e 46  :.......2.....NF
+f1ce: 41 3e 43 46 41                                   A>CFA
+f1d4: 3a e0 d8 ed 1c e0 7f 00 0c e4 c2 e3 0a e8 32 e0  :.............2.
+f1e4: cb f1 ff 06 49 4d 4d 45 44 3f 3a e0 6c e4 62 e3  ....IMMED?:.l.b.
+f1f4: 1c e0 01 00 0c e4 e6 e4 32 e0 e7 f1 ff 04 46 49  ........2.....FI
+f204: 4e 44 3a e0 8e e9 12 e2 7e ec 38 e1 32 e2 4a e8  ND:.......8.2.J.
+f214: 94 e7 ec e0 82 e5 0a 00 12 e1 be f1 58 e3 ec e0  ............X...
+f224: e6 e4 82 e5 e4 ff ec e0 82 e5 14 00 6c e1 ec e0  ............l...
+f234: d4 f1 22 e1 ee f1 e6 e4 1c e0 01 00 1a e4 32 e0  .."...........2.
+f244: 3a e0 ec e0 1c e0 61 00 2a e5 38 e1 1c e0 7a 00  :.....a.*.8.....
+f254: 3e e5 1a e4 82 e5 04 00 32 e0 1c e0 e0 ff c2 e3  >.......2.......
+f264: 32 e0 3a e0 ec e0 c0 ec 38 e1 c2 e3 22 e1 98 e5  2.:.....8..."...
+f274: fa e5 32 e2 44 f2 fa e5 40 e2 be e5 f4 ff 32 e0  ..2.D...@.....2.
+f284: 01 f2 fe 07 4c 49 54 45 52 41 4c                 ....LITERAL
+f290: 3a e0 66 e9 12 e2 82 e5 0a 00 1c e0 1c e0 70 e8  :.f...........p.
+f2a0: a6 f0 32 e0 87 f2 ff 06 44 49 47 49 54 3f 3a e0  ..2.....DIGIT?:.
+f2b0: ec e0 1c e0 39 00 3e e5 1c e0 00 01 0c e4 c2 e3  ....9.>.........
+f2c0: ec e0 1c e0 40 01 3e e5 1c e0 07 01 0c e4 f8 e3  ....@.>.........
+f2d0: 1c e0 30 00 f8 e3 ec e0 58 e9 12 e2 4c e5 32 e0  ..0.....X...L.2.
+f2e0: a7 f2 ff 05 3f 53 49 47 4e                       ....?SIGN
+f2ea: 3a e0 38 e1 32 e2 1c e0 2c 00 f8 e3 ec e0 c6 ea  :.8.2...,.......
+f2fa: 1c e0 01 00 08 e5 0c e4 ec e0 82 e5 0e 00 5e e4  ..............^.
+f30a: 7a e1 1c e0 01 00 06 f1 8a e1 32 e0 e3 f2 ff 07  ..........2.....
+f31a: 3e 4e 55 4d 42 45 52                             >NUMBER
+f322: 3a e0 ec e0 82 e5 2c 00 38 e1 32 e2 ae f2 e6 e4  :.....,.8.2.....
+f332: 82 e5 06 00 12 e1 32 e0 7a e1 90 ec 58 e9 12 e2  ......2.....X...
+f342: 0c ef 8a e1 e2 e3 90 ec 1c e0 01 00 06 f1 6e e5  ..............n.
+f352: d2 ff 32 e0 19 f3 ff 07 3f 4e 55 4d 42 45 52     ..2.....?NUMBER
+f362: 3a e0 ec e0 1c e0 00 00 ec e0 50 e1 c0 ec ea f2  :.........P.....
+f372: 7a e1 22 f3 82 e5 10 00 8a e1 6e ec 6e ec 1c e0  ..".......n.n...
+f382: 00 00 6e e5 12 00 6e ec 6c e1 8a e1 82 e5 04 00  ..n...n.l.......
+f392: 4e e4 1c e0 ff ff 32 e0 59 f3 ff 09 49 4e 54 45  N.....2.Y...INTE
+f3a2: 52 50 52 45 54                                   RPRET
+f3a8: 3a e0 80 e9 56 ec 1c e0 00 00 4c e9 20 e2 d8 f0  :...V.....L. ...
+f3b8: 1c ea 8a f1 ec e0 32 e2 82 e5 44 00 66 f2 06 f2  ......2...D.f...
+f3c8: 00 e1 82 e5 1c 00 5e e4 66 e9 12 e2 e6 e4 1a e4  ......^.f.......
+f3d8: 82 e5 08 00 0c e0 6e e5 04 00 70 e8 6e e5 1c 00  ......n...p.n...
+f3e8: 62 f3 82 e5 08 00 90 f2 6e e5 10 00 c0 ec ac ed  b.......n.......
+f3f8: 1c e0 3f 00 9e e7 d2 ec c2 f4 6e e5 b2 ff 12 e1  ..?.......n.....
+f408: 32 e0 9d f3 ff 08 45 56 41 4c 55 41 54 45 3a e0  2.....EVALUATE:.
+f418: 80 e9 42 ec 7a e1 7a e1 4c e9 12 e2 7a e1 a8 f3  ..B.....L.......
+f428: 8a e1 4c e9 20 e2 8a e1 8a e1 80 e9 56 ec 32 e0  ..L. .......V.2.
+f438: 3a e0 00 e1 82 e5 04 00 9e e7 32 e0 0d f4 ff 04  :.........2.....
+f448: 51 55 49 54 3a e0 e2 e9 a2 e9 20 e2 ec e9 f2 e1  QUIT:..... .....
+f458: 1c e0 00 00 66 e9 20 e2 cc e9 32 e2 38 f4 d2 ec  ....f. ...2.8...
+f468: 02 ea ec e0 12 ea 4c ed cc e9 4a e8 32 e2 38 f4  ......L...J.2.8.
+f478: ec ec a8 f3 66 e9 12 e2 e6 e4 82 e5 30 00 1c e0  ....f.......0...
+f488: 06 00 9e e7 58 e9 12 e2 22 f0 1c e0 24 00 9e e7  ....X..."...$...
+f498: ec e0 42 ef 1c e0 00 00 76 ef 76 ef a2 ef ac ed  ..B.....v.v.....
+f4a8: 58 e9 20 e2 1a ee 03 6f 6b 20 ee ed 6e e5 aa ff  X. ....ok ..n...
+f4b8: 47 f4 ff 05 41 42 4f 52 54                       G...ABORT
+f4c2: 3a e0 f6 e9 ca e1 4c f4 bb f4 ff 06 3f 41 42 4f  :.....L.....?ABO
+f4d2: 52 54 3a e0 50 e1 82 e5 06 00 ee ed c2 f4 6e ec  RT:.P.........n.
+f4e2: 32 e0 cd f4 fe 06 41 42 4f 52 54 22 3a e0 5e ee  2.....ABORT":.^.
+f4f2: 1c e0 d4 f4 70 e8 32 e0 e7 f4 ff 01 27           ....p.2.....'
+f500: 3a e0 1c ea 8a f1 66 f2 06 f2 e6 e4 1a ee 01 3f  :.....f........?
+f510: d4 f4 32 e0 fd f4 ff 04 43 48 41 52 3a e0 1c ea  ..2.....CHAR:...
+f520: 8a f1 5e e4 32 e2 32 e0 17 f5 fe 06 5b 43 48 41  ..^.2.2.....[CHA
+f530: 52 5d 3a e0 1c f5 1c e0 1c e0 70 e8 a6 f0 32 e0  R]:.......p...2.
+f540: 2b f5 fe 01 28                                   +...(
+f546: 3a e0 1c e0 29 00 5c f1 6e ec 32 e0 43 f5 ff 06  :...).\.n.2.C...
+f556: 48 45 41 44 45 52 3a e0 8e e9 12 e2 a6 f0 1c e0  HEADER:.........
+f566: ff 00 be f0 86 f0 8e e9 20 e2 1c ea ce ee 62 e3  ........ .....b.
+f576: 5e e4 98 f0 f0 e7 32 e0 55 f5 ff 07 3c 42 55 49  ^.....2.U...<BUI
+f586: 4c 44 53                                         LDS
+f58a: 3a e0 5c f5 1c e0 02 00 98 f0 32 e0 81 f5 ff 06  :.\.......2.....
+f59a: 43 52 45 41 54 45 3a e0 5c f5 1c e0 6c e0 88 e8  CREATE:.\...l...
+f5aa: 36 f0 a6 f0 32 e0 99 f5 ff 07 28 44 4f 45 53 3e  6...2.....(DOES>
+f5ba: 29                                               )
+f5bc: 3a e0 8a e1 8e e9 12 e2 d4 f1 7c e8 32 e0 b3 f5  :...........2...
+f5cc: fe 05 44 4f 45 53 3e                             ..DOES>
+f5d4: 3a e0 1c e0 bc f5 70 e8 1c e0 d0 e0 b4 e8 32 e0  :.....p.......2.
+f5e4: cd f5 fe 07 52 45 43 55 52 53 45                 ....RECURSE
+f5f0: 3a e0 bc e9 12 e2 d4 f1 70 e8 32 e0 e7 f5 fe 01  :.......p.2.....
+f600: 5b                                               [
+f602: 3a e0 1c e0 00 00 66 e9 20 e2 32 e0 ff f5 ff 01  :.....f. .2.....
+f612: 5d                                               ]
+f614: 3a e0 1c e0 ff ff 66 e9 20 e2 32 e0 11 f6 ff 04  :.....f. .2.....
+f624: 48 49 44 45 3a e0 8e e9 12 e2 ec e0 bc e9 20 e2  HIDE:......... .
+f634: be f1 58 e3 8e e9 20 e2 32 e0 23 f6 ff 06 52 45  ..X... .2.#...RE
+f644: 56 45 41 4c 3a e0 bc e9 12 e2 8e e9 20 e2 32 e0  VEAL:....... .2.
+f654: 41 f6 ff 09 49 4d 4d 45 44 49 41 54 45           A...IMMEDIATE
+f662: 3a e0 1c e0 fe 00 8e e9 12 e2 6c e4 10 e3 32 e0  :.........l...2.
+f672: 57 f6 ff 01 3a                                   W...:
+f678: 3a e0 8a f5 28 f6 14 f6 ca e8 32 e0 75 f6 fe 01  :...(.....2.u...
+f688: 3b                                               ;
+f68a: 3a e0 48 f6 e4 e8 02 f6 32 e0 87 f6 fe 03 5b 27  :.H.....2.....['
+f69a: 5d                                               ]
+f69c: 3a e0 00 f5 1c e0 1c e0 70 e8 a6 f0 32 e0 97 f6  :.......p...2...
+f6ac: fe 08 50 4f 53 54 50 4f 4e 45 3a e0 1c ea 8a f1  ..POSTPONE:.....
+f6bc: 06 f2 ec e0 e6 e4 1a ee 01 3f d4 f4 f6 e4 82 e5  .........?......
+f6cc: 14 00 1c e0 1c e0 70 e8 a6 f0 1c e0 70 e8 70 e8  ......p.....p.p.
+f6dc: 6e e5 04 00 70 e8 32 e0 ad f6 fe 02 49 46 3a e0  n...p.2.....IF:.
+f6ec: 1c e0 82 e5 fa e8 86 f0 32 e9 32 e0 e7 f6 fe 04  ........2.2.....
+f6fc: 54 48 45 4e 3a e0 86 f0 22 e1 1c e9 32 e0 fb f6  THEN:..."...2...
+f70c: fe 04 45 4c 53 45 3a e0 1c e0 6e e5 fa e8 86 f0  ..ELSE:...n.....
+f71c: 32 e9 22 e1 00 f7 32 e0 0d f7 fe 05 42 45 47 49  2."...2.....BEGI
+f72c: 4e                                               N
+f72e: 3a e0 86 f0 32 e0 27 f7 fe 05 55 4e 54 49 4c     :...2.'...UNTIL
+f73e: 3a e0 1c e0 82 e5 fa e8 08 e9 32 e0 37 f7 fe 05  :.........2.7...
+f74e: 41 47 41 49 4e                                   AGAIN
+f754: 3a e0 1c e0 6e e5 fa e8 08 e9 32 e0 4d f7 fe 05  :...n.....2.M...
+f764: 57 48 49 4c 45                                   WHILE
+f76a: 3a e0 ea f6 22 e1 32 e0 63 f7 fe 06 52 45 50 45  :...".2.c...REPE
+f77a: 41 54 3a e0 54 f7 00 f7 32 e0 75 f7 ff 02 3e 4c  AT:.T...2.u...>L
+f78a: 3a e0 20 e8 a2 e9 d0 e3 a2 e9 12 e2 20 e2 32 e0  :. ......... .2.
+f79a: 87 f7 ff 02 4c 3e 3a e0 a2 e9 12 e2 12 e2 20 e8  ....L>:....... .
+f7aa: 4e e4 a2 e9 d0 e3 32 e0 9d f7 fe 02 44 4f 3a e0  N.....2.....DO:.
+f7ba: 1c e0 98 e5 70 e8 86 f0 1c e0 00 00 8a f7 32 e0  ....p.........2.
+f7ca: b5 f7 ff 07 45 4e 44 4c 4f 4f 50                 ....ENDLOOP
+f7d6: 3a e0 fa e8 08 e9 a0 f7 00 e1 82 e5 08 00 00 f7  :...............
+f7e6: 6e e5 f4 ff 32 e0 cd f7 fe 04 4c 4f 4f 50 3a e0  n...2.....LOOP:.
+f7f6: 1c e0 be e5 d6 f7 32 e0 ef f7 fe 05 2b 4c 4f 4f  ......2.....+LOO
+f806: 50                                               P
+f808: 3a e0 1c e0 de e5 d6 f7 32 e0 01 f8 fe 05 4c 45  :.......2.....LE
+f818: 41 56 45                                         AVE
+f81c: 3a e0 1c e0 2c e6 70 e8 1c e0 6e e5 fa e8 86 f0  :...,.p...n.....
+f82c: 32 e9 8a f7 32 e0 15 f8 ff 06 57 49 54 48 49 4e  2...2.....WITHIN
+f83c: 3a e0 38 e1 f8 e3 7a e1 f8 e3 8a e1 4c e5 32 e0  :.8.........L.2.
+f84c: 35 f8 ff 04 4d 4f 56 45 3a e0 7a e1 7e ec 22 e1  5...MOVE:.....".
+f85c: ec e0 9e e1 c2 e3 3c f8 82 e5 0a 00 8a e1 f0 e6  ......<.........
+f86c: 6e e5 06 00 8a e1 cc e6 32 e0 4f f8 ff 05 44 45  n.......2.O...DE
+f87c: 50 54 48                                         PTH
+f880: 3a e0 b4 e1 f6 e9 22 e1 f8 e3 96 e4 32 e0 79 f8  :.....".....2...
+f890: ff 0c 45 4e 56 49 52 4f 4e 4d 45 4e 54 3f 3a e0  ..ENVIRONMENT?:.
+f8a0: 6e ec 1c e0 00 00 32 e0 91 f8 ff 09 46 4c 41 4c  n.....2.....FLAL
+f8b0: 49 47 4e 45 44                                   IGNED
+f8b6: 3a e0 1c e0 00 02 38 e1 f8 e3 1c e0 ff 01 0c e4  :.....8.........
+f8c6: c2 e3 32 e0 ab f8 ff 06 4d 41 52 4b 45 52 3a e0  ..2.....MARKER:.
+f8d6: 8e e9 12 e2 86 f0 36 f0 86 f0 b6 f8 ae e9 20 e2  ......6....... .
+f8e6: 8a f5 a6 f0 a6 f0 a6 f0 bc f5                    ..........
+f8f4: ec e0 58 e3 22 e1 2e e8 ec e0 58 e3 22 e1 2e e8  ..X.".....X."...
+f904: 58 e3 38 e1 b6 f8 86 f0 38 e1 f8 e3 5a e2 8e e9  X.8.....8...Z...
+f914: 20 e2 ae e9 20 e2 70 e9 20 e2 32 e0 cd f8 ff 05   ... .p. .2.....
+f924: 57 4f 52 44 53                                   WORDS
+f92a: 3a e0 8e e9 12 e2 d6 e7 82 e5 10 00 b8 e7 12 e1  :...............
+f93a: b8 e7 1c ea 08 e5 82 e5 1c 00 ec e0 d8 ed 1c e0  ................
+f94a: 7f 00 0c e4 ee ed ec ec be f1 58 e3 ec e0 e6 e4  ..........X.....
+f95a: 82 e5 d4 ff 12 e1 32 e0 23 f9 ff 03 55 2e 52     ......2.#...U.R
+f96a: 3a e0 7a e1 42 ef 1c e0 00 00 8c ef a2 ef 8a e1  :...B...........
+f97a: 38 e1 f8 e3 1c e0 00 00 14 ec fe ec ac ed 32 e0  8.............2.
+f98a: 65 f9 ff 04 44 55 4d 50 3a e0 38 e1 c2 e3 22 e1  e...DUMP:.8...".
+f99a: 98 e5 d2 ec fa e5 1c e0 04 00 6a f9 ec ec ec ec  ..........j.....
+f9aa: fa e5 1c e0 10 00 c2 e3 fa e5 98 e5 fa e5 32 e2  ..............2.
+f9ba: 1c e0 03 00 6a f9 be e5 f4 ff ec ec ec ec fa e5  ....j...........
+f9ca: 1c e0 10 00 c2 e3 fa e5 98 e5 fa e5 32 e2 1c e0  ............2...
+f9da: 7f 00 0c e4 1c e0 7e 00 2c ec 1c ea 14 ec 9e e7  ........,.......
+f9ea: be e5 e8 ff 1c e0 10 00 de e5 a8 ff 32 e0 8d f9  ............2...
+f9fa: ff 02 2e 53 3a e0 b4 e1 f6 e9 f8 e3 82 e5 1c 00  ...S:...........
+fa0a: b4 e1 f6 e9 1c e0 02 00 f8 e3 98 e5 fa e5 12 e2  ................
+fa1a: d0 ef 1c e0 fe ff de e5 f4 ff 32 e0 fb f9 ff 04  ..........2.....
+fa2a: 42 45 4c 4c 3a e0 1c e0 07 00 9e e7 32 e0 3a e0  BELL:.......2.:.
+fa3a: 1c e0 1b 00 9e e7 1c e0 5b 00 9e e7 32 e0 3a e0  ........[...2.:.
+fa4a: 58 e9 12 e2 22 e1 0e f0 2e fc 6a f9 58 e9 20 e2  X...".....j.X. .
+fa5a: 32 e0 3a e0 1c e0 3b 00 9e e7 48 fa 32 e0 29 fa  2.:...;...H.2.).
+fa6a: ff 05 41 54 2d 58 59                             ..AT-XY
+fa72: 3a e0 5e e4 22 e1 5e e4 22 e1 38 fa 48 fa 5c fa  :.^.".^.".8.H.\.
+fa82: 1c e0 48 00 9e e7 32 e0 6b fa ff 04 50 41 47 45  ..H...2.k...PAGE
+fa92: 3a e0 38 fa 1a ee 02 32 4a 00 ee ed 2e fc 2e fc  :.8....2J.......
+faa2: 72 fa 32 e0 8d fa ff 04 2e 56 45 52 3a e0 1a ee  r.2......VER:...
+fab2: 15 34 65 34 74 68 2d 30 2e 35 61 20 32 30 31 38  .4e4th-0.5a 2018
+fac2: 30 35 31 30 0d 0a ee ed 32 e0 a9 fa fe 01 5c     0510....2.....\
+fad2: 3a e0 f2 f0 4c e9 20 e2 12 e1 32 e0 cf fa ff 03  :...L. ...2.....
+fae2: 52 45 44                                         RED
+fae6: 90 e0 21 00 01 00 e1 fa ff 05 47 52 45 45 4e     ..!.......GREEN
+faf6: 90 e0 21 00 40 00 ef fa ff 02 53 32 90 e0 20 00  ..!.@.....S2.. .
+fb06: 08 00 ff fa ff 03 53 32 3f                       ......S2?
+fb10: 3a e0 02 fb 04 fc e6 e4 32 e0 0b fb ff 03 31 4d  :.......2.....1M
+fb20: 53                                               S
+fb22: 3a e0 1c e0 29 00 2e fc 98 e5 1c e0 0b 00 2e fc  :...)...........
+fb32: 98 e5 be e5 fe ff be e5 f2 ff 32 e0 1d fb ff 02  ..........2.....
+fb42: 4d 53 3a e0 2e fc 98 e5 22 fb be e5 fc ff 32 e0  MS:.....".....2.
+fb52: 41 fb ff 04 43 4f 4c 44 3a e0 2a ea 40 e9 92 ea  A...COLD:.*.@...
+fb62: 18 e7 ae fa f6 fa d4 fb e6 fa d4 fb c2 f4 55 fb  ..............U.
+fb72: ff 04 45 49 4e 54 7a fb                          ..EINT..
+fb80: 73 fb ff 04 44 49 4e 54 8a fb                    s...DINT..
+fb90: 83 fb ff 04 53 45 54 42 9a fb                    ....SETB..
+fba4: 93 fb ff 04 43 4c 52 42 ae fb                    ....CLRB..
+fbb8: a7 fb ff 04 54 53 54 42 c2 fb                    ....TSTB..
+fbca: bb fb ff 05 43 53 45 54 42                       ....CSETB
+fbd4: d6 fb                                            ..
+fbe2: cd fb ff 05 43 43 4c 52 42                       ....CCLRB
+fbec: ee fb                                            ..
+fbfa: e5 fb ff 05 43 54 53 54 42                       ....CTSTB
+fc04: 06 fc                                            ..
+fc0e: fd fb ff 07 43 54 4f 47 47 4c 45                 ....CTOGGLE
+fc1a: 1c fc                                            ..
+fc28: 11 fc ff 01 30                                   ....0
+fc2e: 6c e0 00 00 2b fc ff 01 31                       l...+...1
+fc38: 6c e0 01 00 35 fc ff 01 32                       l...5...2
+fc42: 6c e0 02 00 3f fc ff 02 2d 31 6c e0 ff ff        l...?...-1l...
+fc6a: 6c fc 6e fc                                      l.n.
+fc7c: 49 fc ff 0a 49 4e 54 45 52 52 55 50 54 3a 3a e0  I...INTERRUPT::.
+fc8c: 8a f5 28 f6 14 f6 1c e0 fe ff 98 f0 1c e0 a6 fc  ..(.............
+fc9c: 88 e8 1c e0 50 fc a0 e8 32 e0                    ....P...2.
+fcb2: 7f fc ff 07 49 4e 53 54 41 4c 4c                 ....INSTALL
+fcbe: 3a e0 00 f5 62 e8 1c e0 80 10 d8 e9 1c e0 3c 00  :...b.........<.
+fcce: cc e6 22 e1 88 e4 3e e8 d8 e9 c2 e3 1c e0 30 40  .."...>.......0@
+fcde: 38 e1 20 e2 2e e8 20 e2 88 fb 1c e0 80 10 1c e0  8. ... .........
+fcee: 3c 00 5a e2 d8 e9 1c e0 80 10 1c e0 3c 00 6c e3  <.Z.........<.l.
+fcfe: 78 fb 80 e9 12 e2 4c e9 20 e2 32 e0 b5 fc ff 04  x.....L. .2.....
+fd0e: 53 41 56 45 3a e0 40 e9 1c e0 00 10 1c e0 80 00  SAVE:.@.........
+fd1e: 7e ec 5a e2 6c e3 32 e0 0d fd ff 07 52 45 53 54  ..Z.l.2.....REST
+fd2e: 4f 52 45                                         ORE
+fd32: 3a e0 1c e0 00 10 40 e9 1c e0 80 00 18 e7 32 e0  :.....@.......2.
+fd42: 29 fd ff 05 53 43 52 55 42                       )...SCRUB
+fd4c: 3a e0 1c e0 00 c0 1c e0 ff 1f 5a e2 5a fb 45 fd  :.........Z.Z.E.
+fd5c: ff 04 57 49 50 45 3a e0 4c fd                    ..WIPE:.L.
+ffe0: 80 10 84 10 88 10 8c 10 90 10 94 10 98 10 9c 10  ................
+fff0: a0 10 a4 10 a8 10 ac 10 b0 10 b4 10 b8 10 66 fd  ..............f.
+
+
+Program Info:
+                         LABEL ADDRESS  SCOPE
+                          link 0000fd5d 0
+                       PADAREA 00000214 0
+                       TIBAREA 00000214 0
+                        LSTACK 00000266 0
+                        PSTACK 000002c6 0
+                        RSTACK 00000326 0
+                            UP 00000326 0
+                         UAREA 00000328 0
+                       RAMDICT 00000348 0
+                         USAVE 00001000 0
+                       intvecs 0000ffe0 0
+                       VECAREA 00001080 0
+                       EXECUTE 0000e00c 0
+                           lit 0000e01c 0
+                          EXIT 0000e032 0
+                       DOCOLON 0000e03a 0
+                      VARIABLE 0000e04e 0
+                      CONSTANT 0000e064 0
+                      docreate 0000e06c 0
+                         DOVAR 0000e06c 0
+                         DOCON 0000e06c 0
+                   TWOCONSTANT 0000e086 0
+                      DOTWOCON 0000e090 0
+                         DOROM 0000e0a0 0
+                          USER 0000e0b4 0
+                        DOUSER 0000e0bc 0
+                       DOALIAS 0000e0cc 0
+                        dodoes 0000e0d0 0
+                           DUP 0000e0ec 0
+                       PUSHTOS 0000e0ee 0
+                          QDUP 0000e100 0
+                         NODUP 0000e106 0
+                          DROP 0000e112 0
+                          SWAP 0000e122 0
+                          OVER 0000e138 0
+                           ROT 0000e150 0
+                           NIP 0000e16c 0
+                           TOR 0000e17a 0
+                         RFROM 0000e18a 0
+                        RFETCH 0000e19e 0
+                       SPFETCH 0000e1b4 0
+                       SPSTORE 0000e1ca 0
+                       RPFETCH 0000e1dc 0
+                       RPSTORE 0000e1f2 0
+                          TUCK 0000e204 0
+                         FETCH 0000e212 0
+                         STORE 0000e220 0
+                        CFETCH 0000e232 0
+                        CSTORE 0000e240 0
+                       FLERASE 0000e25a 0
+                         FLE_1 0000e260 0
+                      FLE_INFO 0000e270 0
+                        FLE_OK 0000e27c 0
+                       FL_INFO 0000e2ac 0
+                         FLE_X 0000e2b2 0
+                        ISTORE 0000e2be 0
+                      IST_INFO 0000e2d6 0
+                        IST_OK 0000e2e2 0
+                       IST_RAM 0000e2f0 0
+                         IST_X 0000e302 0
+                       ICSTORE 0000e310 0
+                     ICST_INFO 0000e324 0
+                       ICST_OK 0000e330 0
+                      ICST_RAM 0000e33e 0
+                        IFETCH 0000e358 0
+                       ICFETCH 0000e362 0
+                          DTOI 0000e36c 0
+                     DTOI_LOOP 0000e376 0
+                     DTOI_WORD 0000e38c 0
+                     DTOI_BYTE 0000e39e 0
+                      DTOI_END 0000e3a4 0
+                        DTOI_X 0000e3b6 0
+                          PLUS 0000e3c2 0
+                     PLUSSTORE 0000e3d0 0
+                         MPLUS 0000e3e2 0
+                         MINUS 0000e3f8 0
+                          ANDD 0000e40c 0
+                           ORR 0000e41a 0
+                          XORR 0000e42a 0
+                        INVERT 0000e43c 0
+                        NEGATE 0000e44e 0
+                       ONEPLUS 0000e45e 0
+                      ONEMINUS 0000e46c 0
+                     SWAPBYTES 0000e47a 0
+                       TWOSTAR 0000e488 0
+                      TWOSLASH 0000e496 0
+                        LSHIFT 0000e4a8 0
+                         LSH_1 0000e4b2 0
+                         LSH_X 0000e4b8 0
+                        RSHIFT 0000e4c8 0
+                         RSH_1 0000e4d2 0
+                         RSH_X 0000e4da 0
+                     ZEROEQUAL 0000e4e6 0
+                      ZEROLESS 0000e4f6 0
+                         EQUAL 0000e508 0
+                      TOSFALSE 0000e510 0
+                      NOTEQUAL 0000e51c 0
+                          LESS 0000e52a 0
+                       TOSTRUE 0000e532 0
+                       GREATER 0000e53e 0
+                         ULESS 0000e54c 0
+                      UGREATER 0000e55c 0
+                          bran 0000e56e 0
+                        dobran 0000e570 0
+                         qbran 0000e582 0
+                           xdo 0000e598 0
+                         xloop 0000e5be 0
+                     xplusloop 0000e5de 0
+                            II 0000e5fa 0
+                            JJ 0000e610 0
+                        UNLOOP 0000e62c 0
+                        UMSTAR 0000e63e 0
+                          MPYU 0000e642 0
+                          MACU 0000e646 0
+                         L_002 0000e64a 0
+                          L_01 0000e652 0
+                    UMSLASHMOD 0000e66e 0
+                        DIVIDE 0000e674 0
+                          DIV1 0000e67a 0
+                          DIV2 0000e680 0
+                          DIV3 0000e694 0
+                          DIV4 0000e696 0
+                          FILL 0000e6a8 0
+                        FILL_1 0000e6b2 0
+                        FILL_X 0000e6bc 0
+                         CMOVE 0000e6cc 0
+                       CMOVE_1 0000e6d6 0
+                       CMOVE_X 0000e6e0 0
+                       CMOVEUP 0000e6f0 0
+                       CMOVU_1 0000e6fe 0
+                       CMOVU_X 0000e70a 0
+                          ITOD 0000e718 0
+                          SKIP 0000e722 0
+                        SKIP_1 0000e72c 0
+                        SKIP_X 0000e736 0
+                          SCAN 0000e748 0
+                        SCAN_1 0000e752 0
+                        SCAN_X 0000e75c 0
+                        SEQUAL 0000e76c 0
+                        SEQU_1 0000e776 0
+                     SMISMATCH 0000e784 0
+                        SEQU_X 0000e78a 0
+                        NEQUAL 0000e794 0
+                          EMIT 0000e79e 0
+                      EMITLOOP 0000e7a0 0
+                           KEY 0000e7b8 0
+                       KEYLOOP 0000e7ba 0
+                        donoop 0000e7ca 0
+                        donext 0000e7ca 0
+                          KEYQ 0000e7d6 0
+                        ALIGNN 0000e7f0 0
+                       ALIGNED 0000e80a 0
+                          CELL 0000e820 0
+                      CELLPLUS 0000e82e 0
+                         CELLS 0000e83e 0
+                      CHARPLUS 0000e84a 0
+                         CHARS 0000e856 0
+                        TOBODY 0000e862 0
+                       COMMAXT 0000e870 0
+                       STORECF 0000e87c 0
+                       COMMACF 0000e888 0
+                     COMMACALL 0000e8a0 0
+                      COMMAJMP 0000e8b4 0
+                     STORCOLON 0000e8ca 0
+                         CEXIT 0000e8e4 0
+                   COMMABRANCH 0000e8fa 0
+                     COMMADEST 0000e908 0
+                     STOREDEST 0000e91c 0
+                     COMMANONE 0000e932 0
+                            U0 0000e940 0
+                          TOIN 0000e94c 0
+                          BASE 0000e958 0
+                         STATE 0000e966 0
+                           DDP 0000e970 0
+                    TICKSOURCE 0000e980 0
+                        LATEST 0000e98e 0
+                            HP 0000e998 0
+                            LP 0000e9a2 0
+                           IDP 0000e9ae 0
+                        NEWEST 0000e9bc 0
+                        XONOFF 0000e9cc 0
+                           PAD 0000e9d8 0
+                            L0 0000e9e2 0
+                         RZERO 0000e9ec 0
+                            S0 0000e9f6 0
+                           TIB 0000ea02 0
+                       TIBSIZE 0000ea12 0
+                         BLANK 0000ea1c 0
+                         UINIT 0000ea2a 0
+                         NINIT 0000ea92 0
+                          STOD 0000ea9e 0
+                       QNEGATE 0000eab2 0
+                         QNEG1 0000eabc 0
+                          ABBS 0000eac6 0
+                       DNEGATE 0000eada 0
+                      QDNEGATE 0000eaf8 0
+                         DNEG1 0000eb02 0
+                          DABS 0000eb0c 0
+                         MSTAR 0000eb1a 0
+                    SMSLASHREM 0000eb3c 0
+                    FMSLASHMOD 0000eb6a 0
+                        FMMOD2 0000eba2 0
+                        FMMOD1 0000eba2 0
+                          STAR 0000ebae 0
+                      SLASHMOD 0000ebbe 0
+                         SLASH 0000ebd0 0
+                          MODD 0000ebe0 0
+                         SSMOD 0000ebf2 0
+                     STARSLASH 0000ec04 0
+                           MAX 0000ec14 0
+                          MAX1 0000ec20 0
+                           MIN 0000ec2c 0
+                          MIN1 0000ec38 0
+                      TWOFETCH 0000ec42 0
+                      TWOSTORE 0000ec56 0
+                       TWODROP 0000ec6e 0
+                        TWODUP 0000ec7e 0
+                       TWOSWAP 0000ec90 0
+                       TWOOVER 0000eca6 0
+                         COUNT 0000ecc0 0
+                            CR 0000ecd2 0
+                         SPACE 0000ecec 0
+                        SPACES 0000ecfe 0
+                         SPCS1 0000ed00 0
+                         SPCS2 0000ed0e 0
+                          UMIN 0000ed1a 0
+                         UMIN1 0000ed26 0
+                          UMAX 0000ed32 0
+                         UMAX1 0000ed3e 0
+                        ACCEPT 0000ed4c 0
+                          ACC1 0000ed56 0
+                          ACC3 0000ed8c 0
+                          ACC4 0000ed96 0
+                          ACC5 0000ed9a 0
+                           TYP 0000edac 0
+                          TYP3 0000edbc 0
+                          TYP4 0000edca 0
+                          TYP5 0000edcc 0
+                        ICOUNT 0000edd8 0
+                         ITYPE 0000edee 0
+                         ITYP3 0000edfe 0
+                         ITYP4 0000ee0c 0
+                         ITYP5 0000ee0e 0
+                      XISQUOTE 0000ee1a 0
+                       XSQUOTE 0000ee32 0
+                       ISQUOTE 0000ee5e 0
+                        SQUOTE 0000ee86 0
+                      DOTQUOTE 0000eeb8 0
+                         IWORD 0000eece 0
+                    UDSLASHMOD 0000eeec 0
+                        UDSTAR 0000ef0c 0
+                          HOLD 0000ef2a 0
+                       LESSNUM 0000ef42 0
+                       TODIGIT 0000ef56 0
+                           NUM 0000ef76 0
+                          NUMS 0000ef8c 0
+                         NUMS1 0000ef8e 0
+                    NUMGREATER 0000efa2 0
+                          SIGN 0000efba 0
+                         SIGN1 0000efc8 0
+                          UDOT 0000efd0 0
+                           DOT 0000efe8 0
+                       DECIMAL 0000f00e 0
+                           HEX 0000f022 0
+                          HERE 0000f036 0
+                         ALLOT 0000f048 0
+                         COMMA 0000f056 0
+                        CCOMMA 0000f06c 0
+                         IHERE 0000f086 0
+                        IALLOT 0000f098 0
+                        ICOMMA 0000f0a6 0
+                       ICCOMMA 0000f0be 0
+                        QSTACK 0000f0d8 0
+                        SOURCE 0000f0f2 0
+                   SLASHSTRING 0000f106 0
+                     TOCOUNTED 0000f122 0
+                       ADRTOIN 0000f13a 0
+                         PARSE 0000f15c 0
+                        PARSE1 0000f178 0
+                         WORDD 0000f18a 0
+                      NFATOLFA 0000f1be 0
+                      NFATOCFA 0000f1d4 0
+                        IMMEDQ 0000f1ee 0
+                          FIND 0000f206 0
+                         FIND1 0000f20c 0
+                         FIND2 0000f224 0
+                         FIND3 0000f242 0
+                           UPC 0000f244 0
+                          UPC1 0000f25e 0
+                    CAPITALIZE 0000f266 0
+                         CAPS1 0000f274 0
+                         CAPS2 0000f282 0
+                       LITERAL 0000f290 0
+                        LITER1 0000f2a2 0
+                        DIGITQ 0000f2ae 0
+                         QSIGN 0000f2ea 0
+                        QSIGN1 0000f314 0
+                      TONUMBER 0000f322 0
+                        TONUM1 0000f324 0
+                        TONUM2 0000f33a 0
+                        TONUM3 0000f354 0
+                       QNUMBER 0000f362 0
+                         QNUM1 0000f388 0
+                         QNUM2 0000f394 0
+                         QNUM3 0000f398 0
+                     INTERPRET 0000f3a8 0
+                        INTER1 0000f3b6 0
+                        INTER2 0000f3e2 0
+                        INTER3 0000f3e4 0
+                        INTER4 0000f3e8 0
+                        INTER5 0000f3f4 0
+                        INTER6 0000f402 0
+                        INTER8 0000f402 0
+                        INTER9 0000f406 0
+                      EVALUATE 0000f416 0
+                         QEMIT 0000f438 0
+                        QEMIT1 0000f442 0
+                          QUIT 0000f44c 0
+                         QUIT1 0000f460 0
+                         QUIT2 0000f4b4 0
+                         ABORT 0000f4c2 0
+                        QABORT 0000f4d4 0
+                         QABO1 0000f4e0 0
+                    ABORTQUOTE 0000f4ee 0
+                          TICK 0000f500 0
+                         CHARR 0000f51c 0
+                      BRACCHAR 0000f532 0
+                         PAREN 0000f546 0
+                         HEADR 0000f55c 0
+                        BUILDS 0000f58a 0
+                        CREATE 0000f5a0 0
+                         XDOES 0000f5bc 0
+                          DOES 0000f5d4 0
+                       RECURSE 0000f5f0 0
+                   LEFTBRACKET 0000f602 0
+                  RIGHTBRACKET 0000f614 0
+                          HIDE 0000f628 0
+                        REVEAL 0000f648 0
+                     IMMEDIATE 0000f662 0
+                         COLON 0000f678 0
+                     SEMICOLON 0000f68a 0
+                      BRACTICK 0000f69c 0
+                      POSTPONE 0000f6b6 0
+                         POST1 0000f6e0 0
+                         POST2 0000f6e2 0
+                           IFF 0000f6ea 0
+                          THEN 0000f700 0
+                          ELSS 0000f712 0
+                         BEGIN 0000f72e 0
+                         UNTIL 0000f73e 0
+                         AGAIN 0000f754 0
+                         WHILE 0000f76a 0
+                        REPEAT 0000f77c 0
+                           TOL 0000f78a 0
+                         LFROM 0000f7a0 0
+                            DO 0000f7b8 0
+                       ENDLOOP 0000f7d6 0
+                         LOOP1 0000f7dc 0
+                         LOOP2 0000f7ea 0
+                           LOO 0000f7f4 0
+                      PLUSLOOP 0000f808 0
+                          LEAV 0000f81c 0
+                        WITHIN 0000f83c 0
+                          MOVE 0000f854 0
+                         MOVE1 0000f870 0
+                         MOVE2 0000f874 0
+                         DEPTH 0000f880 0
+                  ENVIRONMENTQ 0000f89e 0
+                     FLALIGNED 0000f8b6 0
+                        MARKER 0000f8d4 0
+                         WORDS 0000f92a 0
+                          WDS0 0000f930 0
+                          WDS1 0000f944 0
+                          WDS2 0000f95e 0
+                         UDOTR 0000f96a 0
+                          DUMP 0000f992 0
+                        LDUMP1 0000f99c 0
+                        LDUMP2 0000f9b6 0
+                        LDUMP3 0000f9d4 0
+                          DOTS 0000f9fe 0
+                         DOTS1 0000fa16 0
+                         DOTS2 0000fa24 0
+                          BELL 0000fa2e 0
+                        ESCPAR 0000fa38 0
+                            PN 0000fa48 0
+                        SEMIPN 0000fa5c 0
+                          ATXY 0000fa72 0
+                         PAGEE 0000fa92 0
+                        DOTVER 0000faae 0
+                     BACKSLASH 0000fad2 0
+                           RED 0000fae6 0
+                         GREEN 0000faf6 0
+                            S2 0000fb02 0
+                         SQEST 0000fb10 0
+                         ONEMS 0000fb22 0
+                        onems1 0000fb2c 0
+                        onems2 0000fb34 0
+                            MS 0000fb44 0
+                           ms1 0000fb4a 0
+                          COLD 0000fb5a 0
+                         E_INT 0000fb78 0
+                         D_INT 0000fb88 0
+                          SETB 0000fb98 0
+                          CLRB 0000fbac 0
+                          TSTB 0000fbc0 0
+                         CSETB 0000fbd4 0
+                         CCLRB 0000fbec 0
+                         CTSTB 0000fc04 0
+                       CTOGGLE 0000fc1a 0
+                          ZERO 0000fc2e 0
+                           ONE 0000fc38 0
+                           TWO 0000fc42 0
+                      MINUSONE 0000fc4c 0
+                        HLIRPT 0000fc50 0
+                        HLRETI 0000fc6a 0
+                       XHLRETI 0000fc6c 0
+                     INTERRUPT 0000fc8a 0
+                        DOIRPT 0000fca6 0
+                      DONEIRPT 0000fcae 0
+                       INSTALL 0000fcbe 0
+                          SAVE 0000fd12 0
+                       RESTORE 0000fd32 0
+                         SCRUB 0000fd4c 0
+                          WIPE 0000fd62 0
+                          main 0000fd66 0
+                         reset 0000fd66 0
+                       BRDELAY 0000fde0 0
+                      URESTORE 0000fe06 0
+                        NOAUTO 0000fe3e 0
+                       nullirq 0000fe46 0
+                      lastword 0000fd5d 0
+                          ENDE 0000fe48 0
+ -> Total symbols: 432
+
+Include Paths: .
+               /usr/local/share/naken_asm/include
+               include
+ Instructions: 655
+   Code Bytes: 1702
+   Data Bytes: 6563
+  Low Address: 0200 (512)
+ High Address: ffff (65535)
+

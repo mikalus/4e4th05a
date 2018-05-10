@@ -1,0 +1,674 @@
+      CAMELFORTH FOR THE MSP430 - VERSION 0.5A - 21 APRIL 2014
+      ==========================================================
+
+NOTE: CamelForth/430 version 0.5A is the same as CamelForth/430 version
+0.5, except for the development tools used.  Versions 0.5 and previous
+used the IAR Workbench "Kickstart" to assemble the CamelForth code.
+Version 0.5A uses Mike Kohn's naken_asm cross-assembler, which supports
+several different target processors, and is available for Windows, Mac,
+and Linux.  Find it at <http://www.mikekohn.net/micro/naken_asm.php>
+
+      ==========================================================
+
+This is a BETA TEST version of CamelForth/430, an almost ANSI Standard*
+Forth for the Texas Instruments MSP430 family of microprocessors.  This
+means  that I and others have tested the bulk of this code for correct 
+functioning, and it is believed to be correct, but a few bugs may remain. 
+I'd appreciate hearing of any by email at bj@camelforth.com.
+
+I'll also answer questions and try to solve problems.
+
+* See the end of this file for information about CamelForth's non-ANSI
+CREATE and DOES>.
+
+
+SYSTEM REQUIREMENTS
+-------------------
+Version 0.5 of CamelForth/430 is ready to run on two different MSP430
+boards:
+
+  1. The New Micros Tini430 board, <http://www.newmicros.com/> which uses
+  the MSP430F1611  processor.  It assumes an 8 MHz crystal for XT2, and
+  USART0 at 9600 baud (8,N,1) for terminal I/O.
+
+  2. The Texas Instruments MSP430 Launchpad board (MSP-EXP430G2)
+  <http://www.ti.com/tool/msp-exp430g2> with an MSP430G2553 chip
+  installed. (This chip is not supplied with the Launchpad; it must be
+  purchased separately.)  This uses the on-chip oscillator and on-board
+  USB serial interface for terminal I/O.
+
+Precompiled hex files and source files are supplied for these two boards.
+CamelForth should also be adaptable to any MSP430 device having at least
+512  bytes of RAM, 8K of ROM, and one USART/USCI.
+
+CamelForth/430 is written to be assembled with "naken_asm", which can be
+downloaded from <http://www.mikekohn.net/micro/naken_asm.php>
+
+Older versions of CamelForth/430 are assembled with the IAR Systems MSP430 
+Workbench "Kickstart", which can be downloaded from the TI web page:
+<http://www.ti.com/tool/iar-kickstart>  
+
+For either naken_asm or IAR Workbench, you will also need a tool to 
+"flash" the MSP430.  For Windows, you can use the Elpotronic FET-Pro430 
+free version, found at <http://www.elprotronic.com/fetpro430.html>.  
+This tool will work with both the Tini430 board (parallal JTAG) and the 
+Launchpad (USB JTAG), and probably with most other MSP430 boards.  
+You can also use this tool to install the precompiled CamelForth/430 
+hex files.
+
+For Linux, the "mspdebug" program <http://mspdebug.sourceforge.net/> will
+"flash" the Launchpad via USB.  It does not support parallel-port JTAG.
+
+
+BUILDING CAMELFORTH USING NAKEN_ASM (VERSIONS 0.5A AND LATER)
+-----------------------------------
+If you are going to use one of the precompiled hex files, you can skip to
+"Installing CamelForth," below.
+
+The following files comprise the CamelForth source code:
+
+camel430xxxxx.asm - the main "build file", including memory map 
+
+430xxxxxinit.asm    - device-specific initialization
+430xxxxxinstall.asm - device-specific interrupt INSTALL function
+430xxxxxio.asm      - device-specific I/O
+430xxxxxsave.asm    - device-specific RAM SAVE function
+430xxxxxvecs.asm    - device-specific interrupt vectors
+
+itc430core.asm   - core (assembly language) primitives for ITC model
+itc430deps.asm   - processor and ITC model dependencies
+itc430extras.asm - optional utility words for MSP430
+itc430hilvl.asm  - high level Forth defnitions for ITC kernel
+itc430irpts.asm  - high level interrupt handling for ITC model
+
+msp430xxxxx.inc  - device-specific equates for all source files
+itc430.inc       - common defines and macros for all source files
+
+In this naming convention, "xxxxx" refers to the specific MSP430 
+variant, such as "g2553" or "f1611".  Note that ".asm" and ".inc" file
+extensions are used with naken_asm.  ".s43" ".h" and ".xcl" are IAR
+Workbench files.
+
+Assuming that you have already installed naken_asm:
+
+1. Create a new working directory.  For this example, "cf430".
+
+2. Extract the files from camel430-0.5a.zip into the new directory.
+
+3. From a command line window, issue the command
+     naken_asm -l camel430xxxxx.asm
+   Note that the "-l" is optional (it generates a listing file).
+   This will produce an Intel hex file named out.hex.  You can use that
+   name or rename it to something else.
+   
+4. If you are using the the Elpotronic FET-Pro430 program, you may need
+   to open a text editor and edit the out.hex file.  This is because 
+   naken_asm will produce empty hex records for the allocated RAM 
+   addresses, and this confuses FET-Pro430.  These will be lines in the
+   file with RAM addresses, and 00 data bytes, such as:
+   
+     :1010000000000000000000000000000000000000E0
+     :1010100000000000000000000000000000000000D0
+     :1010200000000000000000000000000000000000C0
+     :1010300000000000000000000000000000000000B0
+     :1010400000000000000000000000000000000000A0
+
+   Use your text editor to delete those lines from the hex file.
+   This does not seem to be a problem when using mspdebug.
+   
+5. Proceed to "Installing CamelForth", below.   
+
+
+BUILDING CAMELFORTH USING THE IAR WORKBENCH (VERSIONS 0.5 AND EARLIER)
+-------------------------------------------
+If you are going to use one of the precompiled hex files, you can skip to
+"Installing CamelForth," below.
+
+The following nine files comprise the CamelForth source code:
+
+init430xxxxx.s43 - memory map and initialization code for specific MCU
+vecs430xxxxx.s43 - interrupt vectors for specific MCU "xxxxx"
+forth430xxxxx.s43 - main "include" file and MCU-specific words
+
+lnk430xxxxx.xcl - linker control file for specific MCU "xxxxx"
+forth.h - common defines and macros for all source files
+
+core430.s43 - CODE (assembly language) primitives for the MSP430
+deps430.s43 - processor and model dependencies for CamelForth
+hilvl430.s43 - high level Forth definitions for the kernel
+extras430.s43 - optional utility words for the MSP430
+install430xxxxx.s43 - interrupt INSTALL function for specific MCU
+irpts430.s43 - high level interrupt handling
+
+Only the first three files are added to the IAR Workbench project.  The
+last six files are INCLUDEd from the forth430xxxxx.s43 source file, and
+are not compiled or linked separately.
+
+You will also need to use the provided linker control file, and not the
+default provided by IAR.
+
+Assuming that you have already installed the IAR MSP430 Workbench:
+
+1. Create a new working directory.  For this example, "cf430".
+
+2. Extract the files from camel430-0.5.zip into the new directory.
+
+3. Launch the MSP430 Workbench.  Click Project -> Create New Project
+to create a new project in current workspace. 
+
+4. In the Create New Project window, select the "asm" template
+(double-click "asm" and then click the "asm" that appears, then click OK).
+
+5. In the Save As window, you will need to specify a directory and a
+Project file name.  Navigate to the directory you created in step 1.  For
+"File name:" you can type whatever you want -- for this example,
+"430forth".  Click Save.
+
+6. In the Workspace window (left side of the screen), click on the Project
+name (e.g. "430forth") to select it.  Then on the menu bar click Project,
+Add Files.  In the Add Files window select forth430xxxxx.s43,
+init430xxxxx.s43, and vecs430xxxxx.s43, where "xxxxx" is the particular
+MSP430 variant you wish to build (e.g. f1611 or g2553).  Then click Open. 
+Do NOT add core430.s43, deps430.s43, hilvl430.s43, or extras430.s43 --
+these are included from forth430xxxxx.
+
+7. On the menu bar, click Project -> Options.  Select "General Options",
+then the "Target" tab.  Under "Device" select the specific MCU you are
+using (e.g. MSP430F1611 or MSP430G2553).  You'll need to click the
+selection button to the right of the current device, then select
+the appropriate family, then the specific device.  Click "OK".
+
+8. Still in the Options window, select "Linker", then the "Config" tab. 
+Under "Linker command file," select the "Override default" box.  Click the
+selection button to the right of the current file, browse to the project
+directory you created in step 1, then select lnk430xxxxxx.xcl where
+"xxxxx" is the MSP430 variant (e.g. f1611 or g2553). Then click Open. 
+Back in the Options window, click OK.
+
+9. In the Workspace window, right-click on "asm.s43", then click Remove. 
+Confirm the removal.
+
+10. On the menu bar, click Project -> Make.  You will need to specify a
+Workspace file name.  This can be whatever you want...you can use
+"430forth" again.  Click Save.  Then the project will be built.  You
+should see number of errors and number of warnings both "0".
+
+This will produce a .d43 file in the subdirectory Debug\Exe.  This file
+can be used directly by the FET-Pro430 program.  
+
+11. If you are using "mspdebug", or for wish to generate a more common hex
+file format, select the project in the Workspace window, and then click
+Project -> Options.  Select "Linker", then the "Output" tab.  Under
+"Format" click the "Other" button, then use the "Output format" drop-down
+menu to select the desired format (e.g. "Intel extended").  This will
+produce an .a43 file instead of .d43 in the Debug\Exe directory.
+
+
+INSTALLING CAMELFORTH
+---------------------
+These instructions are for the Elpotronic FET-Pro430 program.  If you are
+using mspdebug under Linux, refer to their documentation.
+
+1. If you are using a Tini430, plug its JTAG cable into your PC's parallel
+port.  If you are using a Launchpad, plug its USB cable into your PC.
+
+2. Start the FET-Pro430 program.
+
+3. Click "Open Code File" and navigate to the hex file you wish to program.  
+For naken_asm, this will be camel430xxxxx.hex.  For IAR Workbench, the
+file name will be camel430xxxxx.d43 or camel430xxxxx.a43.  If you are 
+using the precompiled files, or are using naken_asm, these will be found 
+in your project directory (where you expanded the zip file).  If you wish 
+to install a file you've just compiled with the IAR Workbench, these 
+will be found in the Debug\Exe subdirectory.  When you have selected 
+the desired .hex, .d43, or .a43 file, click Open.
+
+4. Under "Microcontroller Type" select the MSP430 family (e.g. MSP430F1xx)
+from the "Group" drop-down menu, then select the specific MCU (e.g.
+MSP430F1611) from the drop-down menu below the Group.
+
+5. Under "Device Action" on the right side, select "Reload Code File" if
+it isn't already selected.
+
+6. Click Setup -> Connection/Device Reset.  Under "Communication with
+Target Device", the "JTAG (4 wires)" button should be selected.  Under
+"Used Adapter", the "TI's FET, USB-FET or hardware compatible" button
+should be selected.  Under "Final Target Device action", select "Reset and
+start the application program."  Finally, under "COM Port", if you are
+using a Tini430, select "LPT-1".  If you are using a Launchpad, select
+"USB" (the "Automatic" option for USB should be fine).  Then click OK.
+
+7. Click "AUTO PROG."
+
+Do not be alarmed if the status report says "Blank checking....failed". 
+This just means that there was already a program in the chip.  Any old
+program will be erased.
+
+
+COMMUNICATING WITH CAMELFORTH
+-----------------------------
+After you have installed CamelForth, it should be running on your board.
+
+1. If you are using a Tini430, plug its RS-232 serial cable into a serial
+port on your PC.  If you are using a Launchpad, plug its USB cable into
+your PC (if you haven't already done so).
+
+2. Launch Hyperterminal and create a new connection (with File -> New
+Connection).  Give it a memorable name. Under "Connect Using", for the
+Tini430, you will probably select COM1 (unless you used a different serial
+port on your PC).  For the Launchpad, you will need to select whatever COM
+port was assigned to the USB serial device -- it will be a number other
+than 1-4.  (For example, my PC assigned COM9 to the USB serial port).
+Click OK.  Then select 9600 baud, 8 data bits, Parity "None", 1 stop bit, and
+flow control "None", and click OK.
+
+3. You should then be able to hit Enter and see "ok" as a reply.
+
+
+APPLICATION PROGRAM DEVELOPMENT
+-------------------------------
+There are TWO WAYS to write programs in CamelForth:
+
+1. If you have CamelForth running on your MSP430 board, you can download 
+Forth code directly to CamelForth.  This lets you type new words from the
+keyboard, test them as they are defined, and re-define them to make 
+changes.  Or you can edit an ASCII text file, and use a program such as 
+Hyperterminal to send this file over the serial port to your MSP430.
+
+The current version of Camelforth/430 does not provide flow control.  So,
+when sending source code to the MSP430, you must ensure a delay after each
+full line is sent.  In Hyperterminal, click File->Properties, click the
+"Settings" tab, click "ASCII Setup", and then set "Line delay" to 200
+milliseconds.
+
+Also, be sure that no line in your text file exceeds 80 characters.
+
+See the sections "Direct-to-Flash Compilation", and "Autostarting Your
+Application", below.  See also the document msp430development.pdf,
+included in the zip file.
+
+2. You can add your code to the assembler source files.  This requires 
+you to convert your Forth code to assembler code.  To show how this is 
+done, every high-level Forth word in the file is shown with its equivalent
+Forth code in a comment.  Be especially careful with control structures
+(IF..ELSE..THEN, BEGIN..UNTIL, DO..LOOP, and the like), and with the 
+Forth word headers.  For this option it is recommended that you create a
+new .s43 assembler file, and INCLUDE it at the end of forth430xxxxx.s43.
+This is necessary to preserve the dictionary linking between your new
+definitions and the kernel definitions.  Recompile forth430xxxxx.s43, and 
+download to the MSP430 board, then test.  This is a much slower process, 
+and is best used only for those functions that can't be written in
+high-level Forth (such as assembly-language Forth words).
+
+
+DIRECT-TO-FLASH COMPILATION
+---------------------------
+By default, CamelForth/430 will compile source code directly into the
+MSP430's Flash memory.  This happens automatically any time the
+Instruction Dictionary Pointer (IDP) is set to a location within Flash
+ROM.  
+
+To store data into Flash ROM, you can use the Forth words
+
+    I!      ( u adr -- )    store a 16-bit cell in Flash
+    IC!     ( c adr -- )    store an 8-bit byte in Flash
+    I,      ( u -- )        append a cell to the I dictionary
+    IC,     ( c -- )        append a byte to the I dictionary
+    D->I    ( src dst n -- )   copy from RAM to Flash
+
+NOTE: When using IC, remember that the MSP430 requires that cell fetches
+and stores occur at even addresses.  Appending single bytes can cause 
+the dictionary pointer to become unaligned (odd address) and can cause
+subsequent data to be read incorrectly.
+
+These operators are "smart" in that they will work correctly with 
+addresses in either RAM or Flash ROM, and they will refuse to overwrite
+the CamelForth kernel (locations E000-FFFF).  Remember, though, that a 
+Flash location can be written only one time.  NOTE ESPECIALLY that 
+writing a Flash location more than once can violate the MSP430 specs
+and damage the chip.
+
+D->I is also "smart" in that it will attempt to use word writes, rather
+than byte writes, to minimize the total number of Flash write cycles
+performed.  It will correctly handle even or odd source addresses, even 
+or odd destination addresses, and even or odd lengths.
+
+To erase Flash ROM, use the Forth word
+
+    FLERASE ( adr n -- )    erase a range of Flash memory
+
+The stack effect of FLERASE is the same as that of ERASE, but the
+effects are somewhat different:
+
+    1. Erased Flash will contain FFh bytes, not 00.
+    2. Main Flash (4000-DFFF) is always erased in 512-byte segments.
+    3. Information Flash (1000-10FF) is erased in 128-byte segments.
+    4. FLERASE will not operate below 1000h or above DFFFh.
+    5. Do not use FLERASE with RAM; it is NOT "smart" about RAM.
+       If you attempt to FLERASE an area of RAM, it will write the
+       cell 0FFFFh to every 512th location.
+
+FLERASE will bascially loop, 512 bytes at a time, until 'n' is exceeded.
+This may have unexpected results.  For example:
+
+    HEX 4133 10 FLERASE     will erase 4000-41FF.
+    HEX 4133 1FF FLERASE    will also erase 4000-41FF.
+    HEX 4133 200 FLERASE    will erase 4000-43FF.
+
+To preserve your sanity, it is best to always use an 'adr' which is
+aligned to a Flash segment, and an 'n' which is a multiple of 512 bytes
+(or 128 bytes if erasing Information memory).
+
+CamelForth/430 supports the ANS Forth word MARKER, which automatically
+erases Flash memory that you have used.  If you put the phrase
+
+    MARKER name             where any "name" can be used
+
+at the beginning of your code, CamelForth will align IDP to the next 
+available Flash segment, and will create a word "name" that will
+erase memory back to the marked point.  To be specific, "name" will
+restore IDP, DP, and LATEST (the dictionary head) to the values they
+had before MARKER was executed, thus "unlinking" all definitions
+following "name", and will then erase all Flash used by the definitions
+following "name".  Note that the MARKER word "name" will also erase
+itself.
+
+ERASING YOUR APPLICATION
+------------------------
+
+If, after you compile some definitions, you reset the MSP430 without first
+saving the application (see below), the dictionary pointer will be reset
+to the start of the "used" portion of the Flash, and you won't be able to
+compile new code.  So, if you reset the MCU, you must manually erase the
+application program Flash.  You do this with the command SCRUB.  You can
+use the command SCRUB at any time to erase program Flash and then do
+COLD (coldstart), returning Camelforth to its initial "factory" state.
+
+AUTOSTARTING YOUR APPLICATION
+-----------------------------
+To make your application permanent in ROM, and have it automatically start
+on a reset, you use the word SAVE.
+
+1. The last word compiled in your application must be a colon definition
+which is the startup word.  For example, : MAIN  APP-INIT APP-LOOP ;
+
+2. Be sure you are in HEX, DECIMAL, octal, or binary base.  (This will
+normally be the case.)
+
+3. Type the command SAVE.
+
+4. When you next reset the MCU, the MAIN program will start.
+
+The MAIN word -- or whatever you call it; the name is not important --
+must never return.  In the above example, APP-LOOP must be an endless
+loop.  If you need to start the Forth interpreter after some
+application-specific tasks, use ABORT (not COLD).  For example, 
+: MAIN APP-INIT ABORT ;  
+
+It's considered good practice to include an ABORT after your application
+in case of a programming error, e.g., : MAIN  APP-INIT APP-LOOP ABORT ;
+
+SAVE also saves the 32 bytes of the User Area (kernel variables), the RAM
+interrupt vectors (if used), and the first few application variables, in
+the Information memory of the MSP430.  This is restored when the MCU is
+reset.  You can use this to provide initial values for the first VARIABLEs
+you define.
+
+The amount of RAM saved depends upon the specific MCU; see "Memory map"
+below for the F1611 and G2553.  
+
+Warning!  If the last word in your downloaded application is not a colon
+definition, OR if you have specified an unusual base (such as 36), the
+next time you reset the MCU it will do a COLD start.  You can use RESTORE
+to attempt to recover your application, or do a SCRUB and download your
+application from scratch.  This is described more fully in the document
+msp430development.pdf, included in the zip file.
+
+BYPASSING THE AUTOSTART
+-----------------------
+You might need to recover access to Camelforth after you've set an
+autostart action.  Possibly your application is crashing, or perhaps you
+merely want to start fresh development, without removing and reflashing
+the MCU.  
+
+To do this, on the Tini430, jumper P3.3 to ground (jumper pins 2 and 3 of
+J3) and then reset the board.  On the Launchpad, hold the S2 button and
+reset the board.  This will force a COLD start, which will start the
+CamelForth interpreter in its initial state, with all kernel variables
+initialized.
+
+Note that this does NOT erase the Program Flash.  So, if you wish, you can
+examine the program with the DUMP command.  When you are ready to
+reprogram the MCU, you must do a SCRUB to erase the Flash.
+
+Also, a COLD start does not erase the saved RAM variables in the
+Information ROM.  On the Tini430 and Launchpad, you can examine them
+starting at address $1000.  The next SAVE command will overwrite the saved
+RAM variables.
+
+As long as you don't do a SCRUB or a SAVE, you can remove the bypass
+jumper and the next reset will restart your application.
+
+
+MEMORY MAP
+----------
+The CamelForth memory map is controlled by equates in the init430xxxxx.s43
+assembler source file, and statements in the lnk430xxxxx.xcl linker
+control file.  
+
+CamelForth/430 uses a split Program/Data model.  New definitions are 
+compiled into the Program (Instruction) space, as indicated by the 
+dictionary pointer IDP.  New data structures (e.g., VARIABLEs) are
+allocated in the Data space, as indicated by DP.
+
+Tini430 (MSP430F1611) Memory Map, addresses in hex:
+
+            RAM
+     +---------------+
+     |1100           |
+     |    HOLD area  |
+     |    34 bytes   |
+     |1121           |
+     +---------------+
+     |1122           |
+     |    PAD area   |
+     |    84 bytes   |
+     |1175           |
+     +---------------+
+     |1176           |
+     |    TIB area   |
+     |    84 bytes   |
+     |11C9           |
+     +---------------+
+     |11CA           |
+     |  Param.stack  |
+     |   108 bytes   |
+     |1235           |
+     +---------------+
+     |1236           |
+     |  Return stack |
+     |   108 bytes   |
+     |12A1           |
+     +---------------+
+     |12A2   UP      |          Information ROM
+     +---------------+         +---------------+
+     |12A4           |>>>>>>>>>|1000           |
+     |   User Area   |         |               |
+     |    32 bytes   |  SAVE   |               |
+     |12C3           |  --->   |               |
+     +---------------+         |               |
+     |12C4           |         |               |
+     |   Interrupt   |         |     SAVE      |
+     |    vectors    |         |     area      |
+     |   60 bytes    |         |   128 bytes   |
+     |12FF           |         |               |
+     +---------------+         |               |
+DP-> |1300           |         |               |
+     |  Application  | RESTORE |               |
+     |  "saved" RAM  |  <---   |               |
+     |    36 bytes   |         |               |
+     |1323           |>>>>>>>>>|107F           |
+     +---------------+         +---------------+
+     |1324           |         |1080           |
+     |               |         |               |
+     |               |         |               |
+     |               |         |   available   |
+     |  Application  |         |   for user    |
+     | "unsaved" RAM |         |   128 bytes   |
+     |  ~9.5K bytes  |         |               |
+     |               |         |               |
+     |               |         |10FF           |
+     |               |         +---------------+
+     |               |         
+     |38FF           |        
+     +---------------+            Program ROM                               
+                               +---------------+
+                         IDP-> |4000           |
+                               |               |
+                               |               |
+                               |  Application  |
+                               |     ROM       |
+                               |   40K bytes   |
+                               |               |
+                               |               |
+                               |               |
+                               |DFFF           |
+                               +---------------+
+                               |E000           |
+                               |               |
+                               |               |
+                               |  CamelForth   |
+                               |    kernel     |
+                               |   8K bytes    |
+                               |               |
+                               |               |
+                               |               |
+                               |FFFF           |
+                               +---------------+
+
+LaunchPad (MSP430G2553) Memory Map, addresses in hex:
+
+            RAM
+     +---------------+
+     |0200           |
+     |    HOLD area  |
+     |    20 bytes   |
+     |0213           |
+     +---------------+
+     |0214           |   On the 'G2553, TIB
+     |  TIB/PAD area |   and PAD occupy the
+     |    82 bytes   |   same space. Beware!
+     |0265           |
+     +---------------+
+     |0266           |
+     |  Param.stack  |
+     |    96 bytes   |
+     |02C5           |
+     +---------------+
+     |02C6           |
+     |  Return stack |
+     |    96 bytes   |
+     |0325           |
+     +---------------+
+     |0326   UP      |          Information ROM
+     +---------------+         +---------------+
+     |0328           |>>>>>>>>>|1000           |
+     |   User Area   |         |               |
+     |    32 bytes   |  SAVE   |               |
+     |0347           |  --->   |     SAVE      |
+     +---------------+         |     area      |
+DP-> |0348           |         |   128 bytes   |
+     |  Application  | RESTORE |               |
+     |  "saved" RAM  |  <---   |               |
+     |    96 bytes   |         |               |
+     |03A7           |>>>>>>>>>|107F           |
+     +---------------+         +---------------+
+     |03A8           |         |1080           |
+     |  Application  |         |   interrupt   |
+     | "unsaved" RAM |         |    vectors    |
+     |    88 bytes   |         |   64 bytes    |
+     |03FF           |         |10BF           |
+     +---------------+         +---------------+
+                               |10C0           |
+                               |  calibration  |
+                               |     data      |
+                               |   64 bytes    |
+                               |10FF           |
+                               +---------------+
+                               
+                               
+                                  Program ROM                               
+                               +---------------+
+                         IDP-> |C000           |
+                               |               |
+                               |               |
+                               |  Application  |
+                               |     ROM       |
+                               |   8K bytes    |
+                               |               |
+                               |               |
+                               |               |
+                               |DFFF           |
+                               +---------------+
+                               |E000           |
+                               |               |
+                               |               |
+                               |  CamelForth   |
+                               |    kernel     |
+                               |   8K bytes    |
+                               |               |
+                               |               |
+                               |               |
+                               |FFFF           |
+                               +---------------+
+                               
+*NON-ANSI CREATE and DOES>     
+--------------------------     
+CREATE..DOES> will not work correctly in a direct-to-Flash environment,
+because they requires the Code Field of a defined word to be written
+twice.  (The first time when CREATE gives it the default action "return 
+the parameter address", and the second time when DOES> gives it a user-
+defined action.)  To address this problem, CamelForth provides <BUILDS
+to be used with DOES>.
+
+<BUILDS is the same as CREATE, except that the newly defined word has
+no action (its Code Field cell remains in the erased state).  The word
+DOES> can then write the Code Field cell with the desired action.
+NOTE that you should not attempt to execute a word created with <BUILDS
+until you have performed a DOES> for that word.  (An erased Code Field
+will normally cause a processor reset.)
+
+Also, DOES> can only be used ONCE for a newly-defined word.  This is
+normally not a restriction, since Forth applications that "re-DOES>" a
+defined word are extremely rare (typically, clever academic exercises).
+However, this limitation also violates the ANSI specification.
+
+You can use CREATE..DOES>, and use DOES> multiple times, when compiling 
+to RAM.  This means that CamelForth/430 is only ANS compliant when 
+compiling to RAM!
+
+For "flashable" applications, simply use <BUILDS..DOES> instead of
+CREATE..DOES, and your programs should work.  (Though they won't be 
+ANSI Standard.)
+
+--------------------------- LICENSE TERMS ------------------------------
+CamelForth for the Texas Instruments MSP430 
+(c) 2009,2012,2013,2014 Bradford J. Rodriguez.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+Commercial inquiries should be directed to the author at 
+115 First St., #105, Collingwood, Ontario L9Y 4W3 Canada
+or via email to bj@camelforth.com
+------------------------------------------------------------------------

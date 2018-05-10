@@ -1,0 +1,349 @@
+CAMELFORTH MSP430 RELEASE NOTES
+
+Release 0.5A, 21 April 2014
+===========================
+
+Adapted CamelForth/430 to be assembled with Mike Kohn's naken_asm,
+available at <http://www.mikekohn.net/micro/naken_asm.php>.  
+THIS IS A DEVELOPMENT TOOL CHANGE ONLY.  Version 0.5a produces the
+identical MSP430 code as version 0.5.
+
+File name conventions are as follows:
+   *.asm - naken_asm assembly source files
+   *.inc - naken_asm include files
+   *.hex - naken_asm hex output files
+   
+If you require the IAR Workbench source code, please download version
+0.5 instead.  But do note that all subsequent releases of CamelForth/430
+will be built using naken_asm.
+
+Release 0.5, 25 December 2013
+=============================
+New files: install430g2553.s43, install430f1611.s43, irpts430.s43.
+
+1. High-level Interrupt Handling
+--------------------------------
+The new word INTERRUPT: defines an interrupt handler written in 
+high-level Forth.  The syntax is the same as a colon definition, except
+that INTERRUPT: is used instead of : like this:
+
+    INTERRUPT: name   ...high level code...  ;
+
+That creates a Forth word 'name' which can be installed as an interrupt
+handler.  It will save and restore the necessary CPU registers so that
+high-level code can process the interrupt.  The address of the handler,
+that is the address installed in the vector table, is the PFA (body) of
+the new Forth word, which you can obtain thus:
+
+    ' name >BODY
+
+Note that if you simply type 'name' the high-level code will be
+executed, as if it were an ordinary colon definition.  This gives you a
+way to test the function of the word without enabling interrupts. 
+NOTE, however, that 'name' will save several registers on the return
+stack before executing the code!  (Currently an INTERRUPT: word pushes
+nine cells.)  If you try using INTERRUPT: words as ordinary Forth
+words, you will quickly overflow the return stack! 
+
+On the MSP430F1611 the user vector table is in RAM.  On the MSP430G2553
+the user vector table is in Info ROM.  (See next item.)
+
+If you have added your own CODE words that use registers R14 or R15,
+and you are using those words in your interrupt handler, you will need
+to modify irpts430.s43 to save and restore those registers.  INTERRUPT:
+does not currently save them.  (They're not used by CamelForth.)
+
+2. Interrupt INSTALL 
+--------------------
+On the MSP430G2553, the user interrupt vector table is kept in one
+segment of Info ROM.  To make it easier to install a single vector in
+this table, use the word INSTALL.  The phrase
+
+    n INSTALL name
+
+will install the INTERRUPT: word 'name' as interrupt vector number 'n'.
+On the MSP430G2553, n may be from 0 to 14, as follows:
+
+     user   CPU
+ n   adrs   adrs   function
+ 0 - 1080 - FFE0 - not used
+ 1 - 1084 - FFE2 - not used
+ 2 - 1088 - FFE4 - IO port P1
+ 3 - 108C - FFE6 - IO port P2
+ 4 - 1090 - FFE8 - not used
+ 5 - 1094 - FFEA - ADC10
+ 6 - 1098 - FFEC - USCI A0/B0 tx, I2C tx/rx
+ 7 - 109C - FFEE - USCI A0/B0 rx, I2C status
+ 8 - 10A0 - FFF0 - Timer 0_A3
+ 9 - 10A4 - FFF2 - Timer 0_A3, TA0CCR0 CCIFG
+10 - 10A8 - FFF4 - Watchdog
+11 - 10AC - FFF6 - Comparator A
+12 - 10B0 - FFF8 - Timer 1_A3
+13 - 10B4 - FFFA - Timer 1_A3, TA1CCR0 CCIFG
+14 - 10B8 - FFFC - NMI, osc.fault, flash violation
+     
+Thus "5 INSTALL ADC-SERVICE" will install the word ADC-SERVICE in the
+ADC10 interrupt vector.  The RESET vector may not be changed. 
+
+IMPORTANT: do not INSTALL an ordinary Forth word.  You can only INSTALL
+a word defined with INTERRUPT: or a properly formed machine-code word
+(ending with the RETI instruction).
+
+NOTE that INSTALL uses the Terminal Input Buffer TIB as a temporary
+buffer while it is erasing the Info ROM segment.  This means that
+any text after "n INSTALL name" will be ignored.  The INSTALL command
+should be the last command on the line (typically the only command on
+the line).
+
+VERY IMPORTANT: the word SCRUB does NOT restore the user interrupt
+vectors, and DOES re-enable interrupts after erasing Flash.  This means
+that you MUST disable all active interrupt sources before doing a
+SCRUB.  You must disable them at the source, not with DINT.  Otherwise
+an active interrupt will attempt to execute some just-erased ROM, and
+the system will crash.  You will need to reset the CPU, and possibly
+use the autostart bypass, in order to regain control.  A CPU reset
+always disables all interrupt sources, so it's safe to do SCRUB after a
+hardware reset.
+
+INSTALL is also defined for the MSP430F1611, to write the RAM vector
+table.
+
+3. Download flow control (experimental)
+------------------------
+Release 0.5 adds a new user variable XON/OFF to control pacing when
+uploading text files to the board.  The byte at XON/OFF is the "XON"
+character, sent when the target can receive text.  The byte at XON/OFF
+CHAR+ is the "XOFF" character, sent when the target has received a line
+of text and is interpreting it. These can be used independently -- if
+either byte is null (zero), it will not be sent.  
+
+If your terminal program supports a "line sync" character for pacing,
+use that as the XON character, and leave the XOFF character null.  If
+your terminal program does not offer this feature, try using the ctrl-S
+($13) as XOFF, and ctrl-Q ($11) as XON, and configure your serial port
+for software flow control.  (Alas, this does not seem to work with
+HyperTerminal on Windows.)
+
+Use XOFF with caution if your program expects terminal input. For
+example, if you type the command  KEY HEX .  to accept a  keypress and
+print its hex value, when you hit <CR> CamelForth will send an XOFF
+character to your terminal.  Then your terminal won't let you type a
+key, and you'll be stuck.  One way to handle this automatically is to
+put the phrase   0 XON/OFF CHAR+ C!  at the end of every download.
+
+4. Added words
+--------------
+Added the constants 0, 1, 2, and -1.  (In extras430.s43)
+
+
+Release 0.41, 30 November 2012
+==============================
+
+Changed S" and IS" to use PARSE.
+
+Moved UP to a safer location, immediately below the User Area.
+
+Added RESTORE, which does the mirror image of SAVE: it copies the saved
+RAM data from the Information Flash, back to the User Area and start of
+application RAM.
+
+    RESTORE ( -- )   Copy Information Flash to RAM 
+
+Beware!  Using RESTORE when you have not previously done a SAVE will
+crash.
+
+Release 0.4
+===========
+
+1. Support for MSP430G2553.  
+--------------------------
+Build files are now included to generate CamelForth for the MSP430G2553
+on the T.I. Launchpad board.  These files are: forth430g2553.s43,
+init430g2553.s43, vecs430g2553.s43, and lnk430g2553.xcl.  The memory map
+is as follows:
+
+    Code Flash  C000-DFFF  User application space (8 KB)
+                E000-FFFF  CamelForth kernel (8 KB)
+               
+    Info Flash  1000-107F  Saved RAM area (see below)
+                1080-10BF  User interrupt vectors
+                10C0-10FF  "Info A" calibration data
+
+    RAM         0202-0215  HOLD area (20 bytes)
+                0216-0267  PAD and TIB area (82 bytes)
+                0268-02C7  Parameter stack (96 bytes)
+                02C8-0327  Return stack (96 bytes)
+                0328-0347  User Area (32 bytes)
+                0348-03A7  "Saved" application RAM (96 bytes)
+                03A8-03FF  "Unsaved" application RAM (88 bytes)
+    
+Due to limited RAM space on the 'G2553, the PAD buffer has been made to
+overlap the TIB buffer.  PAD is not used by the kernel; it is present
+only for application programs.  This means the 'G2553 is not strictly
+ANS-compliant, and Standard programs that use PAD may not work
+correctly on the 'G2553.    
+
+2. New file structure.  
+---------------------
+To simplify building CamelForth for different MSP430 variants,
+MCU-specific code in core430.s43 -- EMIT, KEY, and KEY? -- has been
+moved into a new file, forth430xxxxx.s43 (where xxxxx is the specific
+MSP430 device).  The "include" statements for other kernel source files
+have also been moved to the forth430xxxxx.s43 file, so that different
+MCUs can be built with different kernel extensions.
+
+Note that the files init430xxxxx.s43 and vecs430xxxxx.s43 are still
+compiled separately within IAR Workbench.  They are not included from
+forth430xxxxx.s43.
+
+3. New compilation and download procedure.
+-----------------------------------------
+The changes just described mean that the file core430.s43 should NOT be
+added to the IAR Workbench project.  Instead, use the file
+forth430xxxxx.s43.
+
+Also, the newer versions of IAR Workbench do not allow images greater
+than 4 KB to be downloaded to the target hardware.  You will need to use
+a separate downloader to install CamelForth on the MSP430.  For Windows,
+you can use the Elpotronic FET-Pro430 free version, as found at
+<http://www.elprotronic.com/fetpro430.html>.  (Thanks to the 4e4th
+project, <http://www.4e4th.eu/>, for informing me of this program.)
+
+For example, to program a T.I. Launchpad with an MSP430G2553, launch the
+FET-430 program and then:
+
+    a. Plug the Launchpad's USB cable into the PC.
+    b. Click "Open Code File" and navigate to the camel430g2553.d43
+    file, then click Open.
+    c. Under "Microcontroller Type" select "MSP430G2xx" from the "Group"
+    drop-down menu, then select "MSP430G2553" from the drop-down menu
+    below the Group.
+    d. Under "Device Action" on the right side, select "Reload Code
+    File" if it isn't already.
+    e. Click "AUTO PROG."
+
+For Linux you can use "mspdebug" <http://mspdebug.sourceforge.net/> to
+install a program image into an MSP430 device.
+
+4. RAM SAVE, and new RAM order.
+------------------------------
+CamelForth now has the ability to save kernel and user-defined variables
+to the MSP430's Information Flash, and automatically restore those
+variables on reset.  This allows kernel configuration to be changed,
+application data to be stored in a non-volatile manner, and is part of
+the Autostart system (described below).  
+
+To enable this, the order of kernel data structures -- defined in
+init430xxxxx.s43 -- has been slightly changed.  First are the buffers
+for "terminal" tasks: HOLD, TIB and PAD.  Second are the stacks.  Last
+is the User Area, which is followed directly by the application RAM
+(VARIABLEs).  Note that this now allows the space for USER variables to
+be increased by a simple ALLOT at the beginning of your application,
+rather than recompiling the kernel.
+
+The default MSP430 User Area is 32 bytes.  This, plus the first 96 bytes
+of application RAM, is copied to Information Flash with the word SAVE:
+
+    SAVE ( -- )   Copy RAM to Information Flash
+    
+There is no need to erase the Information Flash before doing this; SAVE
+erases the necessary segments.  (On the 'G2553, for example, SAVE does
+not disturb the user interrupt vectors or MSP430 calibration data.)
+
+NOTE that the last word defined before doing a SAVE must be a colon
+definition.  This is part of the "sanity check" for the Information
+Flash, described below.
+
+5. Autostart.
+------------
+On reset, CamelForth 0.4 will restore the saved RAM data, and if that
+data is valid, will then run the last word in the dictionary (as given
+by the kernel variable LATEST).  This word MUST be a colon definition.
+
+Here's why: after initializing the MCU, the "save area" in the
+Information Flash is copied to RAM.  This will initialize the User Area
+with the last-saved values.  Two tests are performed to ensure that this
+is a valid RAM image:
+
+    a. The saved BASE must be 2, 8, 10, or 16.  (To be specific, all
+    bits in BASE other than bits 4, 3, and 1 must be zero.)
+    b. LATEST must point to a colon definition.  (The Code Field of the
+    LATEST definition must contain DOCOLON.)
+    
+If either of these tests fails, the User Area is restored from COLD
+defaults, which allows the Forth interpreter to run with the core
+CamelForth dictionary.  NOTE that this does NOT erase the user
+application flash!  If you are using an MCU (such as the 'G2553) that by
+default compiles directly to Flash, you must erase the application Flash
+before compiling any words.  This is done with the new command SCRUB
+
+    SCRUB ( -- )   Erase user application program area, then do COLD.
+    
+Because SCRUB erases all user application code, it does a COLD to reset
+the dictionary pointers to their defaults.
+
+Sometimes you may need to force the MSP430 to not run the autostart
+code.  This could happen if the autostart word locks up the MCU, or if
+you need a "backdoor" so that you can reprogram a device that has a
+finished application installed.  CamelForth 0.4 includes an "autostart
+bypass" that does COLD immediately after reset.  Details are
+MCU-specific; for example, on the 'G2553 using the T.I. Launchpad, hold
+down the S2 pushbutton (i.e., ground pin P1.3) when doing a reset.
+
+Again, this does NOT erase the user application or the Information
+Flash.  If you bypass the autostart by mistake, simply release the
+button (or remove the jumper) and do a reset, to restart the
+application.
+
+Note that the autostarted application word must never return.  It must
+either run an infinite loop, or end by calling ABORT (which will start
+the Forth interpreter).
+
+6. Added words.  
+--------------
+The new file extras430.s43 adds several words that are useful for MSP430
+applications.  These are not needed by the kernel, so this file may be
+excluded from the build if you wish.
+
+    SETB ( u a-addr -- )   Sets bits in a memory cell.
+        This uses the indivisible BIS instruction.
+    
+    CLRB ( u a-addr -- )   Clears bits in a memory cell.
+        This uses the indivisible BIC instruction.
+    
+    TSTB ( u a-addr -- u2 )   Tests bits in a memory cell.
+        The result returned is the logical AND of u and
+        the memory contents.
+    
+    CSETB ( c c-addr -- )   Sets bits in a memory byte.
+        This uses the indivisible BIS.B instruction.
+    
+    CCLRB ( c c-addr -- )   Clears bits in a memory byte.
+        This uses the indivisible BIC.B instruction.
+    
+    CTSTB ( c c-addr -- c2 )   Tests bits in a memory byte.
+        The result returned is the logical AND of c and
+        the memory contents.
+        
+    EINT ( -- )   Enable global interrupts.
+    
+    DINT ( -- )   Disable global interrupts.
+
+   
+7. Bug fixes
+------------
+The fix for the floored division bug has been installed.  This is
+described at http://www.camelforth.com/fmmod.html
+
+PARSE has been added to fix the problem of ( S" and IS" not properly
+handling null strings, as described at 
+http://www.camelforth.com/e107_plugins/forum/forum_viewtopic.php?128.0
+
+    PARSE ( char "ccc<char>" -- c-addr u )  Parses a string delimited
+        by 'char'; returns an address within the input buffer (usually
+        TIB).  May return a string of zero length.
+
+Changed ( to use PARSE.
+
+The initial value of IDP, where new code is compiled, is now set to the
+start of Flash ROM, instead of a location in RAM.
