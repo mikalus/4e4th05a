@@ -26,9 +26,12 @@
 ;x   NAME     stack -- stack    description
 ;   where x=C for ANS Forth Core words, X for ANS
 ;   Extensions, Z for internal or private words.
+;mk   S for student extensions.
 ; ----------------------------------------------------------------------
 ; REVISION HISTORY
 ;  10 may 18 mk  - added:
+;    dots after prompt indicating number of items on stack (noForth Style)
+;    1ms ms 
 ;    ?STACK checks stack underflow in INTERPRET.
 ;    2CONSTANT GREEN RED S2 S2? 
 ;    WIPE  (same as SCRUB - 4e4th compatibility)
@@ -1082,14 +1085,12 @@ QUIT1:  DW XONOFF,CFETCH,QEMIT          ; send XON
 ;        DB 3,"OK "
 ;        DW ITYPE
 ;mk \print 
-
         DW TIB,DUP,TIBSIZE,ACCEPT
         DW XONOFF,CHARPLUS,CFETCH,QEMIT ; send XOFF
         DW SPACE
         DW INTERPRET
         DW STATE,FETCH,ZEROEQUAL,qbran ;mk (no CR here)
         DEST(QUIT2)
-
 ;mk prompt : compiling was successful ---------------------------------------
 ;mk send : ACK & BASE info 
         DW lit,06H,EMIT         ; ACK
@@ -1100,10 +1101,17 @@ QUIT1:  DW XONOFF,CFETCH,QEMIT          ; send XON
         DW BASE,STORE           ; restore BASE
 ;mk \send  
         DW XISQUOTE
-        DB 3,"ok "
+        DB 2,"ok"
+        .align 16
         DW ITYPE
+        ;mk depth 0 > if depth 0 do [char] . emit loop then \ noForth style :-)
+        DW DEPTH,ZERO,GREATER,qbran
+        DEST(QUIT2)
+        DW DEPTH,ZERO,xdo
+QUIT11: DW lit,".",EMIT
+        DW xloop
+        DEST(QUIT11)
 ;mk \prompt ---------------------------------------
-
 QUIT2:  DW bran
         DEST(QUIT1)
 
