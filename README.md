@@ -1,5 +1,7 @@
 # 4e4th05a
 
+*** debug release ***
+
 4e4th for the MSP430, version 0.5a - 11 May 2018
 based on:
 CAMELFORTH FOR THE MSP430 - VERSION 0.5A - 21 APRIL 2014
