@@ -91,19 +91,20 @@ DOCON:  ; -- x          ; CONSTANT fetches cell from PFA to TOS
         MOV @W,TOS      ; fetch from parameter field to TOS
         NEXT
 
-;C 2CONSTANT   --            define a Forth double constant  ;mk
-;   <BUILDS  I, I,           Flashable Harvard model
-;   DOES> (machine code fragment)
-; Note that the constant is stored in Code space.
-        HEADER(TWOCONSTANT,9,"2CONSTANT",DOCOLON)
-        DW BUILDS,ICOMMA,ICOMMA,XDOES
-DOTWOCON:  ; ( -- w1 w2 )
-      SUB #4,PSP       ; make room on stack
-      MOV TOS,2(PSP)
-      MOV @W+,TOS      ; fetch from parameter field to TOS
-      MOV @W,0(PSP)    ; fetch secon word from parameter field to NOS
-      NEXT
-
+;mk -----------------------------------------------------------------
+;C 2CONSTANT   --            define a Forth double constant (uho)
+;   <BUILDS  I, I,           Flashable Harvard model 
+;   DOES> (machine code fragment) 
+; Note that the constant is stored in Code space. 
+        HEADER(TWOCONSTANT,9,"2CONSTANT",DOCOLON) 
+        DW BUILDS,ICOMMA,ICOMMA,XDOES 
+DOTWOCON:  ; ( -- w1 w2 ) 
+      SUB #4,PSP       ; make room on stack 
+      MOV TOS,2(PSP) 
+      MOV @W+,TOS      ; fetch from parameter field to TOS   ;mk
+      MOV @W,0(PSP)    ; fetch secon word from parameter field to NOS 
+      NEXT 
+;mk \----------------------------------------------------------------
 
 
 ; DOCREATE's action is for a table in RAM.

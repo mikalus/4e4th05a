@@ -28,7 +28,7 @@
 ;   Extensions, Z for internal or private words.
 ; ----------------------------------------------------------------------
 ; REVISION HISTORY
-; 10 May 18 mk - added CTOGGLE
+; 10 May 18 mk - added CTOGB  ;mk
 ;  1 mar 14 bjr - adapted from extras430.s43 for naken_asm.
 ; 22 dec 2013 bjr - added constants 0, 1, 2, -1
 ; 27 oct 2012 bjr - Created.
@@ -80,12 +80,14 @@
 		AND		@PSP+,TOS
 		NEXT
 
-;U CTOGGLE    mask addr --        flip bit from mask in addr (byte)  ;mk
-    CODEHEADER(CTOGGLE,7,"CTOGGLE")
+;mk -------------------------------
+;U CTOGB    mask addr --        flip bit from mask in addr (byte) ;mk
+    CODEHEADER(CTOGB,5,"CTOGB")
       XOR.B   @PSP,0(TOS)
       ADD     #2,PSP
       MOV     @PSP+,TOS
       NEXT
+;mk \------------------------------
 
 ;Z 0    -- n        constant 0
     HEADER(ZERO,1,"0",DOCON)

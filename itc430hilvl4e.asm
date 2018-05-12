@@ -26,20 +26,30 @@
 ;x   NAME     stack -- stack    description
 ;   where x=C for ANS Forth Core words, X for ANS
 ;   Extensions, Z for internal or private words.
-;mk   S for student extensions.
 ; ----------------------------------------------------------------------
 ; REVISION HISTORY
 ;  10 may 18 mk  - added:
-;    dots after prompt indicating number of items on stack (noForth Style)
-;    1ms ms 
-;    ?STACK checks stack underflow in INTERPRET.
-;    2CONSTANT GREEN RED S2 S2? 
-;    WIPE  (same as SCRUB - 4e4th compatibility)
-;    \     for comments
-;    WORDS with stop and go.  
-;    CAPITALIZE (case INsensitiv now)
-;  8 may 18 mk  - added some terminal commands, facorized .VER
-;  7 may 18 mk  - made prompt 4e4th like 
+;    - added 1MS to wait about 1 millisecond.
+;    - added MS to wait about n milliseconds.
+;    - added \ to have comments.
+;    - added BELL to send $07 (bell) to Terminal.
+;    - added ESC[ to start esc-sequence.
+;    - added PN to send parameter of esc-sequence.
+;    - added PN; to send delimiter ; followed by parameter.
+;    - added AT-XY to set cursor position in terminal.
+;    - added PAGE to "page" command to terminal to clear screen.
+;    - added .VER to print version
+;    - added .VER to print version.
+;    - Modified WORDS to stop&go.
+;    - CAPITALIZE in '  (tick)
+;    - modified QUIT to become 4e4th prompt.
+;    - CAPITALIZE in INTERPRET.
+;    - Checking stack underflow in INTERPRET.
+;    - added CAPITALIZE to capitalize string.
+;    - added UPC to capitalize character.
+;    - added ?STACK for checking stack underflow.
+;    - CAPITALIZE in IWORD for case INsensitiv interpretation.
+;    - Modified ACCEPT : backspace writing over characters in terminal.
 ;  1 mar 14 bjr - adapted from hilvl430.s43 for naken_asm.
 ; 22 dec 13 bjr - added XON/OFF logic to interpreter loop
 ; 27 nov 12 bjr - fixed S" IS" to use PARSE
@@ -579,7 +589,7 @@ DOTQUOTE: DW      DOCOLON
 ;   WORD
 ;   IHERE TUCK OVER C@ CHAR+ D->I ;
     HEADER(IWORD,5,"IWORD",DOCOLON)
-;mk        DW WORDD,IHERE,TUCK,OVER,CFETCH
+;       DW WORDD,IHERE,TUCK,OVER,CFETCH            ;mk
         DW WORDD,CAPITALIZE,IHERE,TUCK,OVER,CFETCH ;mk
         DW CHARPLUS,DTOI,EXIT
 
@@ -762,12 +772,14 @@ ICCOMMA: DW      DOCOLON
 ; header.  This may be common across many CPUs,
 ; or it may be different.
 
-; ?STACK   --               check stack underflow  ;mk
+;mk -----------------------------------------------------------------
+; ?STACK   --               check stack underflow 
 ; depth 0< abort" SUF" ;  
    HEADER(QSTACK,6,"?STACK",DOCOLON)
         DW DEPTH,ZEROLESS,XISQUOTE
         DB 3,"SUF"
         DW QABORT,EXIT
+;mk \----------------------------------------------------------------
 
 ;C SOURCE   -- adr n    current input buffer
 ;   'SOURCE 2@ ;        length is at lower adrs
@@ -891,12 +903,11 @@ FIND2:  DW ZEROEQUAL,qbran
         DW SWAP,IMMEDQ,ZEROEQUAL,lit,1,ORR
 FIND3:  DW EXIT
 
-;mk --- capitalize -----------------------------------
-
-;C   UPC   char -- char        capitalize character
-; DUP [CHAR] a < OVER [CHAR] z > OR IF EXIT THEN  
-; [ CHAR A CHAR a - ] LITERAL + ; 
-;  HEADER  UPC,3,'UPC',DOCOLON
+;mk -----------------------------------------------------------------
+;C  UPC   char -- char        capitalize character
+;   DUP [CHAR] a < OVER [CHAR] z > OR IF EXIT THEN  
+;   [ CHAR A CHAR a - ] LITERAL + ; 
+;   HEADER  UPC,3,'UPC',DOCOLON
     HEADLESS(UPC,DOCOLON)
         DW DUP,lit,"a",LESS,OVER,lit,"z",GREATER
         DW ORR,qbran
@@ -905,10 +916,8 @@ FIND3:  DW EXIT
 UPC1:   DW lit,"A"-"a",PLUS
         DW EXIT
 
-;C   CAPITALIZE     c-addr -- c-addr     capitalize string
-; CAPS @ IF DUP COUNT OVER + SWAP ?DO  I c@ upc I c! LOOP THEN
-;mk         DUP COUNT OVER + SWAP ?DO  I c@ upc I c! LOOP          \ no CAPS variable
-
+;C  CAPITALIZE     c-addr -- c-addr     capitalize string
+;   DUP COUNT OVER + SWAP ?DO  I c@ upc I c! LOOP  ; 
 ;   HEADER CAPITALIZE, 10, 'CAPITALIZE', DOCOLON
     HEADLESS(CAPITALIZE,DOCOLON)
 ;        DW CAPS,FETCH,qbran
@@ -918,8 +927,7 @@ CAPS1:  DW II,CFETCH,UPC,II,CSTORE
         DW xloop
         DEST(CAPS1)
 CAPS2:  DW EXIT
-
-;mk --- \capitalize ----------------------------------------
+;mk \ ---------------------------------------------------------------
 
 
 
@@ -1078,40 +1086,33 @@ QEMIT1: DW EXIT
         DW L0,LP,STORE
         DW RZERO,RPSTORE,lit,0,STATE,STORE
 QUIT1:  DW XONOFF,CFETCH,QEMIT          ; send XON
-
-;mk print : 'ready' OK 
         DW CR
 ;        DW XISQUOTE  ; uncomment for prefix prompting
 ;        DB 3,"OK "
 ;        DW ITYPE
-;mk \print 
         DW TIB,DUP,TIBSIZE,ACCEPT
         DW XONOFF,CHARPLUS,CFETCH,QEMIT ; send XOFF
         DW SPACE
         DW INTERPRET
         DW STATE,FETCH,ZEROEQUAL,qbran ;mk (no CR here)
         DEST(QUIT2)
-;mk prompt : compiling was successful ---------------------------------------
-;mk send : ACK & BASE info 
-        DW lit,06H,EMIT         ; ACK
-        DW BASE,FETCH,HEX       ; save BASE, set HEX  
-        DW lit,'$',EMIT         ;
-        ; DUP <# 0 # # #> TYPE  ; type BASE in hex
-        DW DUP,LESSNUM,lit,0,NUM,NUM,NUMGREATER,TYP 
-        DW BASE,STORE           ; restore BASE
-;mk \send  
+        DW lit,06H,EMIT         ;mk  ACK
+        DW BASE,FETCH,HEX       ;mk  save BASE, set HEX  
+        DW lit,'$',EMIT         ;mk  print $
+        ; DUP <# 0 # # #> TYPE  ;mk  type BASE in hex
+        DW DUP,LESSNUM,lit,0,NUM,NUM,NUMGREATER,TYP   ;mk 
+        DW BASE,STORE           ;mk  restore BASE
         DW XISQUOTE
         DB 2,"ok"
         .align 16
-        DW ITYPE
+        DW ITYPE                ; print "ok"
         ;mk depth 0 > if depth 0 do [char] . emit loop then \ noForth style :-)
-        DW DEPTH,ZERO,GREATER,qbran
-        DEST(QUIT2)
-        DW DEPTH,ZERO,xdo
-QUIT11: DW lit,".",EMIT
-        DW xloop
-        DEST(QUIT11)
-;mk \prompt ---------------------------------------
+        DW DEPTH,ZERO,GREATER,qbran ;mk
+        DEST(QUIT2)                 ;mk
+        DW DEPTH,ZERO,xdo           ;mk
+QUIT11: DW lit,".",EMIT             ;mk pint a dot for each item on stack.
+        DW xloop                    ;mk
+        DEST(QUIT11)                ;mk
 QUIT2:  DW bran
         DEST(QUIT1)
 
@@ -1146,7 +1147,7 @@ ABORTQUOTE: DW      DOCOLON
 ;   BL WORD FIND
 ;   0= ABORT" ?" ;
     HEADER(TICK,1,27h,DOCOLON)
-;mk        DW BLANK,WORDD,FIND,ZEROEQUAL,XISQUOTE
+;       DW BLANK,WORDD,FIND,ZEROEQUAL,XISQUOTE            ;mk
         DW BLANK,WORDD,CAPITALIZE,FIND,ZEROEQUAL,XISQUOTE ;mk
         DB 1,'?'
         DW QABORT,EXIT
@@ -1476,6 +1477,7 @@ MOVE2:  DW EXIT
         DW OVER,FLALIGNED,IHERE,OVER,MINUS,FLERASE
         DW LATEST,STORE,IDP,STORE,DDP,STORE,EXIT
 
+;mk -----------------------------------------------------------------
 ;X WORDS    --          list all words in dict.
 ;   LATEST @ BEGIN
 ;       DUP HCOUNT 7F AND HTYPE SPACE
@@ -1490,7 +1492,7 @@ MOVE2:  DW EXIT
 ;        DEST(WDS1)
 ;        DW DROP,EXIT
 
-;X   WORDS    --          list all words in dict. Stop and go feature.  ;mk
+;X   WORDS    --          list all words in dict. Stop and go feature. 
 ;   LATEST @ BEGIN
 ;       KEY? IF KEY DROP KEY 0x0D = IF DROP EXIT THEN THEN  
 ;       DUP HCOUNT 7F AND HTYPE SPACE
@@ -1502,14 +1504,14 @@ MOVE2:  DW EXIT
 WDS0:   DW KEYQ,qbran
         DEST(WDS1)
         DW KEY,DROP ; halt
-        DW KEY,BLANK,EQUAL,qbran ; go on if blank, else quit words
+        DW KEY,BLANK,EQUAL,qbran ; do if blank, else quit WORDS
         DEST(WDS2)
 WDS1:   DW DUP,HCOUNT,lit,07FH,ANDD,HTYPE,SPACE
         DW NFATOLFA,HFETCH
         DW DUP,ZEROEQUAL,qbran
         DEST(WDS0)
 WDS2:   DW DROP,EXIT
-
+;mk \----------------------------------------------------------------
 
 ;X U.R    u n --           display u unsigned in n width
 ;   >R  <# 0 #S #>  R> OVER - 0 MAX SPACES  TYPE ;
@@ -1549,21 +1551,18 @@ DOTS1:  DW II,FETCH,UDOT,lit,-2,xplusloop
         DEST(DOTS1)
 DOTS2:  DW EXIT
 
-
-
-; mk --- Terminal commands
-
-;U   BELL     --                send $07 to Terminal
+;mk -----------------------------------------------------------------
+;U   BELL     --                send $07 to Terminal  ;mk
      HEADER(BELL,4,"BELL",DOCOLON)
          DW lit,07h,EMIT,EXIT
 
-;Z   ESC[     --                start esc-sequence
+;Z   ESC[     --                start esc-sequence  ;mk
 ; 27 emit 91 emit ;
      HEADLESS(ESCPAR,DOCOLON)
          DW lit,27,EMIT,lit,91,EMIT
          DW EXIT
 
-;Z   PN      --                 send parameter of esc-sequence
+;Z   PN      --                 send parameter of esc-sequence  ;mk
 ; base @  swap decimal 0 u.r  base ! ; 
      HEADLESS(PN,DOCOLON)
          DW BASE,FETCH
@@ -1571,13 +1570,13 @@ DOTS2:  DW EXIT
          DW BASE,STORE
          DW EXIT
 
-;Z   ;PN    --                  send delimiter ; followed by parameter
+;Z   ;PN    --                  send delimiter ; followed by parameter ;mk
 ; 59 emit pn ;
      HEADLESS(SEMIPN,DOCOLON)
          DW lit,59,EMIT,PN
          DW EXIT
 
-;U   AT-XY   x y --          set cursor position in terminal
+;U   AT-XY   x y --          set cursor position in terminal ;mk
 ; 1+ swap 1+ swap ESC[ pn ;pn 72 emit ; 
      HEADER(ATXY,5,"AT-XY",DOCOLON)
          DW ONEPLUS,SWAP,ONEPLUS,SWAP
@@ -1585,7 +1584,7 @@ DOTS2:  DW EXIT
          DW SEMIPN,lit,72,EMIT
          DW EXIT
 
-;U   PAGE    --              send "page" command to terminal to clear screen.
+;U   PAGE    --              send "page" command to terminal to clear screen. ;mk
 ; esc[  ." 2J" 0 0 at-xy ;
      HEADER(PAGEE,4,"PAGE",DOCOLON)
         DW ESCPAR
@@ -1594,16 +1593,18 @@ DOTS2:  DW EXIT
         DW ITYPE
         DW ZERO,ZERO,ATXY
         DW EXIT
+;mk \----------------------------------------------------------------
 
-; mk --- \Terminal commands
-
-;X .VER     --      print version string  ;mk
+;mk -----------------------------------------------------------------
+;X .VER     --      print version string.  ;mk
     HEADER(DOTVER,4,".VER",DOCOLON)
         DW XISQUOTE
         DB 21,"4e4th-0.5a 20180510",0dh,0ah
         DW ITYPE,EXIT
+;mk \----------------------------------------------------------------
 
-;U   \         --      backslash          ;mk
+;mk -----------------------------------------------------------------
+;U   \         --      backslash  ;mk
 ; everything up to the end of the current line is a comment. 
 ;   SOURCE >IN ! DROP ; 
 ;    IMMED(BACKSLASH,1,"\",DOCOLON)   ; geht so nicht, header manuell compilieren:
@@ -1615,39 +1616,10 @@ DOTS2:  DW EXIT
         .align 16
 BACKSLASH: DW      DOCOLON
         DW SOURCE,TOIN,STORE,DROP,EXIT 
+;mk \----------------------------------------------------------------
 
-;U PORT1 ----------------------------- ;mk
-; TI document SLAU144I - December 2004 - Revised January 2012 
-; The digital I/O registers are listed in Table 8-2. 
-; LEDs of MSP-EXP430G2 LaunchPad : port.pin Px.n ->--- resistor --- LED --- GND
-
-;U RED      -- mask port         red LED mask and port address
-;  P1.0 - red LED
-    HEADER(RED,3,"RED",DOTWOCON)
-	  DW P1OUT
-	  DW 00000001b
-
-;U GREEN     -- mask port        green LED mask and port address
-;  P1.6 - green LED
-    HEADER(GREEN,5,"GREEN",DOTWOCON)
-      DW P1OUT
-      DW 01000000b
-
-;U S2        -- mask port        second button mask and port address
-; Switch S2 : port.pin P1.3 --->0_0----GND
-    HEADER(S2,2,"S2",DOTWOCON)
-      DW P1IN
-      DW 00001000b
-
-;U S2?     -- f    test button S2, true if pressed 
-    HEADER(SQEST,3,"S2?",DOCOLON)
-        DW S2,CTSTB,ZEROEQUAL,EXIT
-
-;U \PORT1 ----------------------------- ;mk
-
-
-
-;U 1MS  --   wait about 1 millisecond  ;mk
+;mk -----------------------------------------------------------------
+;S 1MS  --   wait about 1 millisecond  ;mk
 ;  xx 0 DO yy 0 DO LOOP LOOP ;  adjust xx and yy to get a msec.
      HEADER(ONEMS,3,"1MS",DOCOLON)
          DW lit,41,ZERO,xdo 
@@ -1657,17 +1629,18 @@ onems2:  DW xloop
          DW xloop
          DEST(onems1)
          DW EXIT
+;mk \----------------------------------------------------------------
 
-;U MS  n --                wait about n milliseconds  ;mk
+;mk -----------------------------------------------------------------
+;S MS  n --                wait about n milliseconds  ;mk
 ;  0 DO 1MS LOOP ;
      HEADER(MS,2,"MS",DOCOLON)
          DW ZERO,xdo
 ms1:     DW ONEMS,xloop
          DEST(ms1)
          DW EXIT
+;mk \----------------------------------------------------------------
          
-
-
 ;Z COLD     --      cold start Forth system
 ;   UINIT U0 #INIT I->D      init user area
 ;   .VER  ; mk

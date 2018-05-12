@@ -23,6 +23,9 @@
 ; B. Rodriguez 27 nov 2012
 ; ----------------------------------------------------------------------
 ; REVISION HISTORY
+; 10 may 2018 mk 
+;    - added WIPE
+;    - eliminated two exits : never returns.
 ;  2 mar 2014 bjr - created from forth430g2553.s43 for naken_asm.
 
 ; SAVE erases the first 128 bytes of Info Flash, then
@@ -44,7 +47,7 @@
         DW  COLD 
 ;mk     DW  EXIT   ; COLD does ABORT, never returns.
 
-        HEADER(WIPE,4,"WIPE",DOCOLON)
-        DW  SCRUB ;mk   4e4th compatibility
+        HEADER(WIPE,4,"WIPE",DOCOLON)   ;mk    4e4th compatibility
+        DW  SCRUB                       ;mk
 ;mk     DW EXIT   ; ends in COLD, does ABORT, never returns.
 

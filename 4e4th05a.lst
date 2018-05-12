@@ -133,14 +133,15 @@ USAVE:  DS16  UAREA_SIZE
 
 .include "430g2553vecs.asm" ; note: sets .org for vector tables
         .org 0E000h         ; start address of CamelForth kernel
-.include "itc430core.asm"   ; code primitives
+.include "itc430core4e.asm"   ; code primitives
 .include "430g2553io.asm"
 .include "itc430deps.asm"
-.include "itc430hilvl-mk.asm"
-.include "itc430extras.asm"
+.include "itc430hilvl4e.asm"
+.include "itc430extras4e.asm"
 .include "itc430irpts.asm"
 .include "430g2553install.asm"
-.include "430g2553save.asm"
+.include "430g2553save4e.asm"
+.include "430g2553Launchpad.asm"
 
 INITIP   equ COLD+2         ; default coldstart word (high-level)
 .include "430g2553init.asm"
@@ -342,7 +343,7 @@ ea02: bc e0 ec fe fd e9 ff 07 54 49 42 53 49 5a 45     ........TIBSIZE
 ea12: 6c e0 50 00 09 ea ff 02 42 4c 6c e0 20 00 19 ea  l.P.....BLl. ...
 ea22: ff 05 55 49 4e 49 54                             ..UINIT
 ea2a: a0 e0 00 00 00 00 0a 00 00 00 48 03 00 00 00 00  ..........H.....
-ea3a: 77 fd 00 00 00 00 00 c0 00 00 00 00 00 00 00 00  w...............
+ea3a: 8b fd 00 00 00 00 00 c0 00 00 00 00 00 00 00 00  ................
 ea4a: 00 00                                            ..
 ea88: 23 ea ff 05 23 49 4e 49 54                       #...#INIT
 ea92: 6c e0 5c 00 8b ea ff 03 53 3e 44                 l.\.....S>D
@@ -527,7 +528,7 @@ f478: ec ec a8 f3 66 e9 12 e2 e6 e4 82 e5 4a 00 1c e0  ....f.......J...
 f488: 06 00 9e e7 58 e9 12 e2 22 f0 1c e0 24 00 9e e7  ....X..."...$...
 f498: ec e0 42 ef 1c e0 00 00 76 ef 76 ef a2 ef ac ed  ..B.....v.v.....
 f4a8: 58 e9 20 e2 1a ee 02 6f 6b                       X. ....ok
-f4b2: ee ed 9a f8 48 fc 3e e5 82 e5 12 00 9a f8 48 fc  ....H.>.......H.
+f4b2: ee ed 9a f8 0a fc 3e e5 82 e5 12 00 9a f8 0a fc  ......>.........
 f4c2: 98 e5 1c e0 2e 00 9e e7 be e5 f8 ff 6e e5 90 ff  ............n...
 f4d2: 47 f4 ff 05 41 42 4f 52 54                       G...ABORT
 f4dc: 3a e0 f6 e9 ca e1 4c f4 d5 f4 ff 06 3f 41 42 4f  :.....L.....?ABO
@@ -632,68 +633,69 @@ fa24: b4 e1 f6 e9 1c e0 02 00 f8 e3 98 e5 fa e5 12 e2  ................
 fa34: d0 ef 1c e0 fe ff de e5 f4 ff 32 e0 15 fa ff 04  ..........2.....
 fa44: 42 45 4c 4c 3a e0 1c e0 07 00 9e e7 32 e0 3a e0  BELL:.......2.:.
 fa54: 1c e0 1b 00 9e e7 1c e0 5b 00 9e e7 32 e0 3a e0  ........[...2.:.
-fa64: 58 e9 12 e2 22 e1 0e f0 48 fc 84 f9 58 e9 20 e2  X..."...H...X. .
+fa64: 58 e9 12 e2 22 e1 0e f0 0a fc 84 f9 58 e9 20 e2  X...".......X. .
 fa74: 32 e0 3a e0 1c e0 3b 00 9e e7 62 fa 32 e0 43 fa  2.:...;...b.2.C.
 fa84: ff 05 41 54 2d 58 59                             ..AT-XY
 fa8c: 3a e0 5e e4 22 e1 5e e4 22 e1 52 fa 62 fa 76 fa  :.^.".^.".R.b.v.
 fa9c: 1c e0 48 00 9e e7 32 e0 85 fa ff 04 50 41 47 45  ..H...2.....PAGE
-faac: 3a e0 52 fa 1a ee 02 32 4a 00 ee ed 48 fc 48 fc  :.R....2J...H.H.
+faac: 3a e0 52 fa 1a ee 02 32 4a 00 ee ed 0a fc 0a fc  :.R....2J.......
 fabc: 8c fa 32 e0 a7 fa ff 04 2e 56 45 52 3a e0 1a ee  ..2......VER:...
 facc: 15 34 65 34 74 68 2d 30 2e 35 61 20 32 30 31 38  .4e4th-0.5a 2018
 fadc: 30 35 31 30 0d 0a ee ed 32 e0 c3 fa fe 01 5c     0510....2.....\
 faec: 3a e0 f2 f0 4c e9 20 e2 12 e1 32 e0 e9 fa ff 03  :...L. ...2.....
-fafc: 52 45 44                                         RED
-fb00: 90 e0 21 00 01 00 fb fa ff 05 47 52 45 45 4e     ..!.......GREEN
-fb10: 90 e0 21 00 40 00 09 fb ff 02 53 32 90 e0 20 00  ..!.@.....S2.. .
-fb20: 08 00 19 fb ff 03 53 32 3f                       ......S2?
-fb2a: 3a e0 1c fb 1e fc e6 e4 32 e0 25 fb ff 03 31 4d  :.......2.%...1M
-fb3a: 53                                               S
-fb3c: 3a e0 1c e0 29 00 48 fc 98 e5 1c e0 0b 00 48 fc  :...).H.......H.
-fb4c: 98 e5 be e5 fe ff be e5 f2 ff 32 e0 37 fb ff 02  ..........2.7...
-fb5c: 4d 53 3a e0 48 fc 98 e5 3c fb be e5 fc ff 32 e0  MS:.H...<.....2.
-fb6c: 5b fb ff 04 43 4f 4c 44 3a e0 2a ea 40 e9 92 ea  [...COLD:.*.@...
-fb7c: 18 e7 c8 fa 10 fb ee fb 00 fb ee fb dc f4 6f fb  ..............o.
-fb8c: ff 04 45 49 4e 54 94 fb                          ..EINT..
-fb9a: 8d fb ff 04 44 49 4e 54 a4 fb                    ....DINT..
-fbaa: 9d fb ff 04 53 45 54 42 b4 fb                    ....SETB..
-fbbe: ad fb ff 04 43 4c 52 42 c8 fb                    ....CLRB..
-fbd2: c1 fb ff 04 54 53 54 42 dc fb                    ....TSTB..
-fbe4: d5 fb ff 05 43 53 45 54 42                       ....CSETB
-fbee: f0 fb                                            ..
-fbfc: e7 fb ff 05 43 43 4c 52 42                       ....CCLRB
-fc06: 08 fc                                            ..
-fc14: ff fb ff 05 43 54 53 54 42                       ....CTSTB
-fc1e: 20 fc                                             .
-fc28: 17 fc ff 07 43 54 4f 47 47 4c 45                 ....CTOGGLE
-fc34: 36 fc                                            6.
-fc42: 2b fc ff 01 30                                   +...0
-fc48: 6c e0 00 00 45 fc ff 01 31                       l...E...1
-fc52: 6c e0 01 00 4f fc ff 01 32                       l...O...2
-fc5c: 6c e0 02 00 59 fc ff 02 2d 31 6c e0 ff ff        l...Y...-1l...
-fc84: 86 fc 88 fc                                      ....
-fc96: 63 fc ff 0a 49 4e 54 45 52 52 55 50 54 3a 3a e0  c...INTERRUPT::.
-fca6: a4 f5 42 f6 2e f6 1c e0 fe ff 98 f0 1c e0 c0 fc  ..B.............
-fcb6: 88 e8 1c e0 6a fc a0 e8 32 e0                    ....j...2.
-fccc: 99 fc ff 07 49 4e 53 54 41 4c 4c                 ....INSTALL
-fcd8: 3a e0 1a f5 62 e8 1c e0 80 10 d8 e9 1c e0 3c 00  :...b.........<.
-fce8: cc e6 22 e1 88 e4 3e e8 d8 e9 c2 e3 1c e0 30 40  .."...>.......0@
-fcf8: 38 e1 20 e2 2e e8 20 e2 a2 fb 1c e0 80 10 1c e0  8. ... .........
-fd08: 3c 00 5a e2 d8 e9 1c e0 80 10 1c e0 3c 00 6c e3  <.Z.........<.l.
-fd18: 92 fb 80 e9 12 e2 4c e9 20 e2 32 e0 cf fc ff 04  ......L. .2.....
-fd28: 53 41 56 45 3a e0 40 e9 1c e0 00 10 1c e0 80 00  SAVE:.@.........
-fd38: 7e ec 5a e2 6c e3 32 e0 27 fd ff 07 52 45 53 54  ..Z.l.2.'...REST
-fd48: 4f 52 45                                         ORE
-fd4c: 3a e0 1c e0 00 10 40 e9 1c e0 80 00 18 e7 32 e0  :.....@.......2.
-fd5c: 43 fd ff 05 53 43 52 55 42                       C...SCRUB
-fd66: 3a e0 1c e0 00 c0 1c e0 ff 1f 5a e2 74 fb 5f fd  :.........Z.t._.
-fd76: ff 04 57 49 50 45 3a e0 66 fd                    ..WIPE:.f.
+fafc: 31 4d 53                                         1MS
+fb00: 3a e0 1c e0 29 00 0a fc 98 e5 1c e0 0b 00 0a fc  :...)...........
+fb10: 98 e5 be e5 fe ff be e5 f2 ff 32 e0 fb fa ff 02  ..........2.....
+fb20: 4d 53 3a e0 0a fc 98 e5 00 fb be e5 fc ff 32 e0  MS:...........2.
+fb30: 1f fb ff 04 43 4f 4c 44 3a e0 2a ea 40 e9 92 ea  ....COLD:.*.@...
+fb40: 18 e7 c8 fa 92 fd b2 fb 82 fd b2 fb dc f4 33 fb  ..............3.
+fb50: ff 04 45 49 4e 54 58 fb                          ..EINTX.
+fb5e: 51 fb ff 04 44 49 4e 54 68 fb                    Q...DINTh.
+fb6e: 61 fb ff 04 53 45 54 42 78 fb                    a...SETBx.
+fb82: 71 fb ff 04 43 4c 52 42 8c fb                    q...CLRB..
+fb96: 85 fb ff 04 54 53 54 42 a0 fb                    ....TSTB..
+fba8: 99 fb ff 05 43 53 45 54 42                       ....CSETB
+fbb2: b4 fb                                            ..
+fbc0: ab fb ff 05 43 43 4c 52 42                       ....CCLRB
+fbca: cc fb                                            ..
+fbd8: c3 fb ff 05 43 54 53 54 42                       ....CTSTB
+fbe2: e4 fb                                            ..
+fbec: db fb ff 05 43 54 4f 47 42                       ....CTOGB
+fbf6: f8 fb                                            ..
+fc04: ef fb ff 01 30                                   ....0
+fc0a: 6c e0 00 00 07 fc ff 01 31                       l.......1
+fc14: 6c e0 01 00 11 fc ff 01 32                       l.......2
+fc1e: 6c e0 02 00 1b fc ff 02 2d 31 6c e0 ff ff        l.......-1l...
+fc46: 48 fc 4a fc                                      H.J.
+fc58: 25 fc ff 0a 49 4e 54 45 52 52 55 50 54 3a 3a e0  %...INTERRUPT::.
+fc68: a4 f5 42 f6 2e f6 1c e0 fe ff 98 f0 1c e0 82 fc  ..B.............
+fc78: 88 e8 1c e0 2c fc a0 e8 32 e0                    ....,...2.
+fc8e: 5b fc ff 07 49 4e 53 54 41 4c 4c                 [...INSTALL
+fc9a: 3a e0 1a f5 62 e8 1c e0 80 10 d8 e9 1c e0 3c 00  :...b.........<.
+fcaa: cc e6 22 e1 88 e4 3e e8 d8 e9 c2 e3 1c e0 30 40  .."...>.......0@
+fcba: 38 e1 20 e2 2e e8 20 e2 66 fb 1c e0 80 10 1c e0  8. ... .f.......
+fcca: 3c 00 5a e2 d8 e9 1c e0 80 10 1c e0 3c 00 6c e3  <.Z.........<.l.
+fcda: 56 fb 80 e9 12 e2 4c e9 20 e2 32 e0 91 fc ff 04  V.....L. .2.....
+fcea: 53 41 56 45 3a e0 40 e9 1c e0 00 10 1c e0 80 00  SAVE:.@.........
+fcfa: 7e ec 5a e2 6c e3 32 e0 e9 fc ff 07 52 45 53 54  ..Z.l.2.....REST
+fd0a: 4f 52 45                                         ORE
+fd0e: 3a e0 1c e0 00 10 40 e9 1c e0 80 00 18 e7 32 e0  :.....@.......2.
+fd1e: 05 fd ff 05 53 43 52 55 42                       ....SCRUB
+fd28: 3a e0 1c e0 00 c0 1c e0 ff 1f 5a e2 38 fb 21 fd  :.........Z.8.!.
+fd38: ff 04 57 49 50 45 3a e0 28 fd 39 fd ff 02 53 32  ..WIPE:.(.9...S2
+fd48: 90 e0 20 00 08 00 45 fd ff 03 53 32 3f           .. ...E...S2?
+fd56: 3a e0 48 fd e2 fb e6 e4 32 e0 51 fd ff 04 50 31  :.H.....2.Q...P1
+fd66: 49 4e 6c e0 20 00 63 fd ff 05 50 31 4f 55 54     INl. .c...P1OUT
+fd76: 6c e0 21 00 6f fd ff 03 52 45 44                 l.!.o...RED
+fd82: 90 e0 21 00 01 00 7d fd ff 05 47 52 45 45 4e     ..!.......GREEN
+fd92: 90 e0 21 00 40 00                                ..!.@.
 ffe0: 80 10 84 10 88 10 8c 10 90 10 94 10 98 10 9c 10  ................
-fff0: a0 10 a4 10 a8 10 ac 10 b0 10 b4 10 b8 10 80 fd  ................
+fff0: a0 10 a4 10 a8 10 ac 10 b0 10 b4 10 b8 10 98 fd  ................
 
 
 Program Info:
                          LABEL ADDRESS  SCOPE
-                          link 0000fd77 0
+                          link 0000fd8b 0
                        PADAREA 00000214 0
                        TIBAREA 00000214 0
                         LSTACK 00000266 0
@@ -1084,56 +1086,58 @@ Program Info:
                          PAGEE 0000faac 0
                         DOTVER 0000fac8 0
                      BACKSLASH 0000faec 0
-                           RED 0000fb00 0
-                         GREEN 0000fb10 0
-                            S2 0000fb1c 0
-                         SQEST 0000fb2a 0
-                         ONEMS 0000fb3c 0
-                        onems1 0000fb46 0
-                        onems2 0000fb4e 0
-                            MS 0000fb5e 0
-                           ms1 0000fb64 0
-                          COLD 0000fb74 0
-                         E_INT 0000fb92 0
-                         D_INT 0000fba2 0
-                          SETB 0000fbb2 0
-                          CLRB 0000fbc6 0
-                          TSTB 0000fbda 0
-                         CSETB 0000fbee 0
-                         CCLRB 0000fc06 0
-                         CTSTB 0000fc1e 0
-                       CTOGGLE 0000fc34 0
-                          ZERO 0000fc48 0
-                           ONE 0000fc52 0
-                           TWO 0000fc5c 0
-                      MINUSONE 0000fc66 0
-                        HLIRPT 0000fc6a 0
-                        HLRETI 0000fc84 0
-                       XHLRETI 0000fc86 0
-                     INTERRUPT 0000fca4 0
-                        DOIRPT 0000fcc0 0
-                      DONEIRPT 0000fcc8 0
-                       INSTALL 0000fcd8 0
-                          SAVE 0000fd2c 0
-                       RESTORE 0000fd4c 0
-                         SCRUB 0000fd66 0
-                          WIPE 0000fd7c 0
-                          main 0000fd80 0
-                         reset 0000fd80 0
-                       BRDELAY 0000fdfa 0
-                      URESTORE 0000fe20 0
-                        NOAUTO 0000fe58 0
-                       nullirq 0000fe60 0
-                      lastword 0000fd77 0
-                          ENDE 0000fe62 0
- -> Total symbols: 433
+                         ONEMS 0000fb00 0
+                        onems1 0000fb0a 0
+                        onems2 0000fb12 0
+                            MS 0000fb22 0
+                           ms1 0000fb28 0
+                          COLD 0000fb38 0
+                         E_INT 0000fb56 0
+                         D_INT 0000fb66 0
+                          SETB 0000fb76 0
+                          CLRB 0000fb8a 0
+                          TSTB 0000fb9e 0
+                         CSETB 0000fbb2 0
+                         CCLRB 0000fbca 0
+                         CTSTB 0000fbe2 0
+                         CTOGB 0000fbf6 0
+                          ZERO 0000fc0a 0
+                           ONE 0000fc14 0
+                           TWO 0000fc1e 0
+                      MINUSONE 0000fc28 0
+                        HLIRPT 0000fc2c 0
+                        HLRETI 0000fc46 0
+                       XHLRETI 0000fc48 0
+                     INTERRUPT 0000fc66 0
+                        DOIRPT 0000fc82 0
+                      DONEIRPT 0000fc8a 0
+                       INSTALL 0000fc9a 0
+                          SAVE 0000fcee 0
+                       RESTORE 0000fd0e 0
+                         SCRUB 0000fd28 0
+                          WIPE 0000fd3e 0
+                            S2 0000fd48 0
+                         SQEST 0000fd56 0
+                          p1in 0000fd68 0
+                         p1out 0000fd76 0
+                           RED 0000fd82 0
+                         GREEN 0000fd92 0
+                          main 0000fd98 0
+                         reset 0000fd98 0
+                       BRDELAY 0000fe12 0
+                      URESTORE 0000fe38 0
+                        NOAUTO 0000fe70 0
+                       nullirq 0000fe78 0
+                      lastword 0000fd8b 0
+                          ENDE 0000fe7a 0
+ -> Total symbols: 435
 
 Include Paths: .
                /usr/local/share/naken_asm/include
                include
  Instructions: 655
    Code Bytes: 1702
-   Data Bytes: 6588
+   Data Bytes: 6611
   Low Address: 0200 (512)
  High Address: ffff (65535)
 

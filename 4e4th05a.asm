@@ -133,14 +133,15 @@ USAVE:  DS16  UAREA_SIZE
 
 .include "430g2553vecs.asm" ; note: sets .org for vector tables
         .org 0E000h         ; start address of CamelForth kernel
-.include "itc430core.asm"   ; code primitives
+.include "itc430core4e.asm"   ; code primitives
 .include "430g2553io.asm"
 .include "itc430deps.asm"
-.include "itc430hilvl-mk.asm"
-.include "itc430extras.asm"
+.include "itc430hilvl4e.asm"
+.include "itc430extras4e.asm"
 .include "itc430irpts.asm"
 .include "430g2553install.asm"
-.include "430g2553save.asm"
+.include "430g2553save4e.asm"
+.include "430g2553Launchpad.asm"
 
 INITIP   equ COLD+2         ; default coldstart word (high-level)
 .include "430g2553init.asm"
