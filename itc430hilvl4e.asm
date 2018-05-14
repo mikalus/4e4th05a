@@ -122,6 +122,12 @@
     HEADER(XONOFF,7,"XON/OFF",DOUSER)
         DW 24
 
+;Z CAPS  -- a-addr          CAPS=true --> case sensitive ;mk
+;   26 USER CAPS 
+    HEADER(CAPS,4,"CAPS",DOUSER)
+        DW 26
+
+; user variables 28,30 tbd  ;mk
 ; user variables 26,28,30 tbd
 
 ;X PAD       -- a-addr    user PAD buffer
@@ -168,7 +174,8 @@
         DW ROMDICT      ; IDP
         DW 0            ; NEWEST not init'd
         DW 0            ; XON/OFF initially disabled
-        DW 0,0,0        ; user variables TBD
+        DW 0FFFFH       ; CAPS flag. 0 = case sensitive  
+        DW 0,0          ; user variables TBD
     ; RAM interrupt vectors, 15 vectors of 2 cells each
         MOV #nullirq,PC
         MOV #nullirq,PC
@@ -920,8 +927,8 @@ UPC1:   DW lit,"A"-"a",PLUS
 ;   DUP COUNT OVER + SWAP ?DO  I c@ upc I c! LOOP  ; 
 ;   HEADER CAPITALIZE, 10, 'CAPITALIZE', DOCOLON
     HEADLESS(CAPITALIZE,DOCOLON)
-;        DW CAPS,FETCH,qbran
-;        DEST(CAPS2)
+        DW CAPS,FETCH,qbran
+        DEST(CAPS2)
         DW DUP,COUNT,OVER,PLUS,SWAP,xdo
 CAPS1:  DW II,CFETCH,UPC,II,CSTORE
         DW xloop
