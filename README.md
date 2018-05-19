@@ -24,7 +24,8 @@ Download and install the free 430 version of the elprotronic programmer at
 Select the correct processor 430G2553, point to the hex file you find here and follow the steps.  
 Do not forget RESET after programming.
 
-Then start your favourite Terminal program and start writing short examples, like in:   https://wiki.forth-ev.de/doku.php/en:projects:a-start-with-forth:start0  
+Then start your favourite Terminal program and start writing short examples, like in:  
+https://wiki.forth-ev.de/doku.php/en:projects:a-start-with-forth:start0  
 and there probably chapter 11c as a good starting point.
 
 ## Start with Forth  
