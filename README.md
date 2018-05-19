@@ -1,10 +1,9 @@
 # 4e4th Naken Version Forth
- - 11 May 2018
 
 *** debug release ***
 
 4e4th Version 0.5a for the TI MSP430G2553 Value Line LaunchPad Develpoment Tool (MSP-EXP430G2), Rev. 1.5 chip.  
-One of the few processors still available in the breadboard friendy 20 Pin DIL Package. 
+One of the few processors still available in the breadboard friendy 20 Pin DIL Package.  
 4e4th and application will run ON this chip.
 
 Based on Brad Rodriguez’s CamelForth for the MSP430, version 0.5a, 21 apr 2014. http://www.camelforth.com/news.php
@@ -28,27 +27,27 @@ Do not forget RESET after programming.
 Then start your favourite Terminal program and start writing short examples, like in:   https://wiki.forth-ev.de/doku.php/en:projects:a-start-with-forth:start0  
 and there probably chapter 11c as a good starting point.
 
-## Start with Forth 
+## Start with Forth  
 - Quickstart  
 Connect to 4e4th on your Launchpad using a terminal emulator.  
 Compile and save demo forth application: blink.4th  
-4e4th is case insensitive, type as youlike, upper- or lower case.
+4e4th is case insensitive, you may type WORDS upper- or lower case.
 
 - New to Forth?  
 https://wiki.forth-ev.de/doku.php/en:projects:a-start-with-forth:start0  
 There are various Forth systems mentioned, but the handling is the same.
 
-- New to the TI LaunchPad?
+- New to the TI LaunchPad?  
 https://wiki.forth-ev.de/doku.php/projects:4e4th:start
 
-- New to 4e4th?
+- New to 4e4th?  
 Go through the documentation at https://wiki.forth-ev.de/doku.php/en:projects:4e4th:start
 
-- Need the Programmer? 
+- Need the Programmer?  
 https://www.elprotronic.com/  
 "Lite FET-Pro430 Elprotronic Programmer" burns image into MCU.
 
-- More books
+- More books  
 https://wiki.forth-ev.de/doku.php/en:projects:litlist  
 and  
 https://wiki.forth-ev.de/doku.php/en:projects:pintaske_s_electronic_forth_bookshelf
