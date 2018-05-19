@@ -42,7 +42,8 @@ There are various Forth systems mentioned, but the handling is the same.
 https://wiki.forth-ev.de/doku.php/projects:4e4th:start
 
 - New to 4e4th?  
-Go through the documentation at https://wiki.forth-ev.de/doku.php/en:projects:4e4th:start
+Go through the documentation at https://wiki.forth-ev.de/doku.php/en:projects:4e4th:start  
+Read readme.430, releasenotes.txt, msp430development.pdf and CFvs4e4th05a.pdf to learn more.
 
 - Need the Programmer?  
 https://www.elprotronic.com/  
