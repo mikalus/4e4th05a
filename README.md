@@ -54,6 +54,12 @@ https://wiki.forth-ev.de/doku.php/en:projects:litlist
 and  
 https://wiki.forth-ev.de/doku.php/en:projects:pintaske_s_electronic_forth_bookshelf
 
+## Glossary for all Words
+
+There is a glosary for all words of 4e4th forth.  
+Sorted alphabetically and arranged according to functional groups.  
+These were automatically generated from the word comments.
+
 ## Verification
 
 ## To Do
