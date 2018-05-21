@@ -58,7 +58,8 @@ https://wiki.forth-ev.de/doku.php/en:projects:pintaske_s_electronic_forth_booksh
 
 There is a glosary for all words of 4e4th forth.  
 Sorted alphabetically and arranged according to functional groups.  
-These were automatically generated from the word comments.
+These were automatically generated from the word comments.  
+Let GlossaryMaker.py run to renew it.
 
 ## Verification
 
