@@ -28,25 +28,26 @@
 ;    - eliminated two exits : never returns.
 ;  2 mar 2014 bjr - created from forth430g2553.s43 for naken_asm.
 
-; SAVE erases the first 128 bytes of Info Flash, then
-; copies the User Area and subsequent RAM variables there.
+;Z SAVE   ---         erases the first 128 bytes of Info Flash, then
+;Z copies the User Area and subsequent RAM variables there.
         HEADER(SAVE,4,"SAVE",DOCOLON)
         DW  U0,lit,USAVE,lit,INFO_SIZE
         DW  TWODUP,FLERASE,DTOI,EXIT
         
-; RESTORE copies the first 128 bytes of Info Flash to
-; the User Area and subsequent RAM.
+;Z RESTORE   ---      copies the first 128 bytes of Info Flash to
+;Z the User Area and subsequent RAM.
         HEADER(RESTORE,7,"RESTORE",DOCOLON)
         DW  lit,USAVE,U0,lit,INFO_SIZE
         DW  ITOD,EXIT
 
-; SCRUB erases the application area of the Program Flash,
-; and then does COLD to reset the User Variables.
+;Z SCRUB   ---      erases the application area of the Program Flash,
+;Z and then does COLD to reset the User Variables.
         HEADER(SCRUB,5,"SCRUB",DOCOLON)
         DW  lit,FLASHSTART,lit,(FLASHEND-FLASHSTART),FLERASE
         DW  COLD 
 ;mk     DW  EXIT   ; COLD does ABORT, never returns.
 
+;Z WIPE    ---      same as SCRUB
         HEADER(WIPE,4,"WIPE",DOCOLON)   ;mk    4e4th compatibility
         DW  SCRUB                       ;mk
 ;mk     DW EXIT   ; ends in COLD, does ABORT, never returns.

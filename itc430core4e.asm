@@ -36,8 +36,7 @@
 ;        MOV @IP+,W      ; 2 fetch word address into W
 ;        MOV @W+,PC      ; 2 fetch code address into PC, W=PFA
 
-;C EXECUTE   i*x xt -- j*x   execute Forth word
-;C                           at 'xt'
+;C EXECUTE   i*x xt -- j*x   execute Forth word at 'xt'
         CODEHEADER(EXECUTE,7,"EXECUTE")
         MOV TOS,W       ; 1 put word address into W
         MOV @PSP+,TOS   ; 2 fetch new TOS
@@ -613,8 +612,8 @@ dobran:  ADD @IP,IP   ; 2
         ADD #2,IP       ; 1  else skip the branch destination
         NEXT            ; 4
 
-;Z (do)    n1|u1 n2|u2 --  R: -- sys1 sys2
-;Z                          run-time code for DO
+;Z (do)    n1|u1 n2|u2 --      run-time code for DO
+;Z (do)    R: -- sys1 sys2                     
 ; '83 and ANSI standard loops terminate when the boundary of 
 ; limit-1 and limit is crossed, in either direction.  This can 
 ; be conveniently implemented by making the limit 8000h, so that
@@ -638,8 +637,8 @@ xdo: DW     $+2
         MOV     @PSP+,TOS       ; pop new TOS
         NEXT
 
-;Z (loop)   R: sys1 sys2 --  | sys1 sys2
-;Z                        run-time code for LOOP
+;Z (loop)   R: sys1 sys2 --     run-time code for LOOP
+;Z (loop)   -- sys1 sys2                   
 ; Add 1 to the loop index.  If loop terminates, clean up the 
 ; return stack and skip the branch.  Else take the inline branch.  
 ; Note that LOOP terminates when index=8000h.
@@ -658,8 +657,9 @@ xloop: DW     $+2
         MOV     @RSP+,LIMIT
         NEXT
 
-;Z (+loop)   n --   R: sys1 sys2 --  | sys1 sys2
-;Z                        run-time code for +LOOP
+;Z (+loop)   n --           run-time code for +LOOP
+;Z (+loop)   R: sys1 sys2 -- 
+;Z (+loop)   -- sys1 sys2  
 ; Add n to the loop index.  If loop terminates, clean up the 
 ; return stack and skip the branch. Else take the inline branch.
         ; CODEHEADER(xplusloop,7,"(+loop)")
@@ -678,8 +678,8 @@ xplusloop: DW     $+2
         MOV     @RSP+,LIMIT
         NEXT
 
-;C I        -- n   R: sys1 sys2 -- sys1 sys2
-;C                  get the innermost loop index
+;C I        -- n             get the innermost loop index
+;C I R: sys1 sys2 -- sys1 sys2               
         CODEHEADER(II,1,"I")
         SUB     #2,PSP          ; make room in TOS
         MOV     TOS,0(PSP)
@@ -687,8 +687,8 @@ xplusloop: DW     $+2
         SUB     LIMIT,TOS
         NEXT
 
-;C J        -- n   R: 4*sys -- 4*sys
-;C                  get the second loop index
+;C J        -- n                  get the second loop index
+;C J R: 4*sys -- 4*sys 
         CODEHEADER(JJ,1,"J")
         SUB     #2,PSP          ; make room in TOS
         MOV     TOS,0(PSP)
@@ -696,7 +696,8 @@ xplusloop: DW     $+2
         SUB     2(RSP),TOS
         NEXT
 
-;C UNLOOP   --   R: sys1 sys2 --  drop loop parms
+;C UNLOOP      --               drop loop parms
+;C UNLOOP R: sys1 sys2 -- 
         CODEHEADER(UNLOOP,6,"UNLOOP")
         MOV     @RSP+,INDEX     ; restore old loop values
         MOV     @RSP+,LIMIT
@@ -817,8 +818,7 @@ CMOVU_X: MOV    @PSP+,TOS   ; pop new TOS
 ; On the MSP430, this is the same as CMOVE.
        HEADER(ITOD,4,"I->D",CMOVE+2)
 
-;Z SKIP   c-addr u c -- c-addr' u'
-;Z                          skip matching chars
+;Z SKIP   c-addr u c -- c-addr' u'           skip matching chars                        
 ; Although SKIP, SCAN, and S= are perhaps not the ideal factors 
 ; of WORD and FIND, they closely follow the string operations 
 ; available on many CPUs, and so are easy to implement and fast.
@@ -836,8 +836,7 @@ SKIP_X: MOV     W,0(PSP)    ; store updated address on stack
         MOV     X,TOS       ; updated count to TOS
         NEXT
 
-;Z SCAN    c-addr u c -- c-addr' u'
-;Z                      find matching char
+;Z SCAN    c-addr u c -- c-addr' u'           find matching char
         CODEHEADER(SCAN,4,"SCAN")
         MOV     @PSP+,X     ; get count
         MOV     @PSP,W      ; get address, leave space on stack
@@ -852,8 +851,8 @@ SCAN_X: MOV     W,0(PSP)    ; store updated address on stack
         MOV     X,TOS       ; updated count to TOS
         NEXT
 
-;Z S=    c-addr1 c-addr2 u -- n   string compare
-;Z             n<0: s1<s2, n=0: s1=s2, n>0: s1>s2
+;Z S=    c-addr1 c-addr2 u -- n          string compare
+;Z S= n<0: s1<s2, n=0: s1=s2, n>0: s1>s2
         CODEHEADER(SEQUAL,2,"S=")
         MOV     @PSP+,W     ; adrs2
         MOV     @PSP+,X     ; adrs1
@@ -872,9 +871,9 @@ SMISMATCH: SUBC TOS,TOS     ; TOS=-1 if borrow was set
         ADD     #1,TOS      ; TOS=-1 or +1
 SEQU_X: NEXT                ; return result in TOS
 
-;Z N=    c-addr1 c-addr2 u -- n   name compare
-;Z             n<0: s1<s2, n=0: s1=s2, n>0: s1>s2
+;Z N=    c-addr1 c-addr2 u -- n        name compare
+;Z N= n<0: s1<s2, n=0: s1=s2, n>0: s1>s2
 ; For Harvard model, c-addr1 is Data, c-addr2 is Header.
 ; On MSP430, both use the same fetch instruction, so N= is the same as S=.
         HEADER(NEQUAL,2,"N=",SEQUAL+2)
-
+;       links to S=

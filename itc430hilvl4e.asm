@@ -881,8 +881,8 @@ PARSE1: DW ADRTOIN
         DW ONEMINUS,HCFETCH,lit,1,ANDD,ZEROEQUAL,EXIT
 
 ;C FIND   c-addr -- c-addr 0   if not found
-;C                  xt  1      if immediate
-;C                  xt -1      if "normal"
+;C FIND   c-addr -- xt  1      if immediate
+;C FIND   c-addr -- xt -1      if "normal"
 ;   LATEST @ BEGIN             -- a nfa
 ;       2DUP OVER C@ CHAR+     -- a nfa a nfa n+1
 ;       N=                     -- a nfa f
@@ -911,7 +911,7 @@ FIND2:  DW ZEROEQUAL,qbran
 FIND3:  DW EXIT
 
 ;mk -----------------------------------------------------------------
-;C  UPC   char -- char        capitalize character
+;C UPC     char -- char                     capitalize character
 ;   DUP [CHAR] a < OVER [CHAR] z > OR IF EXIT THEN  
 ;   [ CHAR A CHAR a - ] LITERAL + ; 
 ;   HEADER  UPC,3,'UPC',DOCOLON
@@ -923,7 +923,7 @@ FIND3:  DW EXIT
 UPC1:   DW lit,"A"-"a",PLUS
         DW EXIT
 
-;C  CAPITALIZE     c-addr -- c-addr     capitalize string
+;C CAPITALIZE     c-addr -- c-addr          capitalize string
 ;   DUP COUNT OVER + SWAP ?DO  I c@ upc I c! LOOP  ; 
 ;   HEADER CAPITALIZE, 10, 'CAPITALIZE', DOCOLON
     HEADLESS(CAPITALIZE,DOCOLON)
@@ -949,7 +949,7 @@ CAPS2:  DW EXIT
 LITER1: DW EXIT
 
 ;Z DIGIT?   c -- n -1   if c is a valid digit
-;Z            -- x  0   otherwise
+;Z DIGIT?   c -- x  0   otherwise
 ;   [ HEX ] DUP 39 > 100 AND +     silly looking
 ;   DUP 140 > 107 AND -   30 -     but it works!
 ;   DUP BASE @ U< ;
@@ -959,8 +959,8 @@ LITER1: DW EXIT
         DW MINUS,lit,30h,MINUS
         DW DUP,BASE,FETCH,ULESS,EXIT
 
-;Z ?SIGN   adr n -- adr' n' f  get optional sign
-;Z  advance adr/n if sign; return NZ if negative
+;Z ?SIGN   adr n -- adr' n' f      get optional sign
+;Z ?SIGN advance adr/n if sign; return NZ if negative
 ;   OVER C@                 -- adr n c
 ;   2C - DUP ABS 1 = AND    -- +=-1, -=+1, else 0
 ;   DUP IF 1+               -- +=0, -=+2
@@ -973,8 +973,7 @@ LITER1: DW EXIT
         DW ONEPLUS,TOR,lit,1,SLASHSTRING,RFROM
 QSIGN1: DW EXIT
 
-;C >NUMBER  ud adr u -- ud' adr' u'
-;C                      convert string to number
+;C >NUMBER  ud adr u -- ud' adr' u'     convert string to number
 ;   BEGIN
 ;   DUP WHILE
 ;       OVER C@ DIGIT?
@@ -996,8 +995,8 @@ TONUM2: DW TOR,TWOSWAP,BASE,FETCH,UDSTAR
         DEST(TONUM1)
 TONUM3: DW EXIT
 
-;Z ?NUMBER  c-addr -- n -1      string->number
-;Z                 -- c-addr 0  if convert error
+;Z ?NUMBER  c-addr -- n -1        string->number
+;Z ?NUMBER  c-addr -- c-addr 0    if convert error
 ;   DUP  0 0 ROT COUNT      -- ca ud adr n
 ;   ?SIGN >R  >NUMBER       -- ca ud adr' n'
 ;   IF   R> 2DROP 2DROP 0   -- ca 0   (error)
@@ -1017,8 +1016,7 @@ QNUM1:  DW TWODROP,NIP,RFROM,qbran
 QNUM2:  DW lit,-1
 QNUM3:  DW EXIT
 
-;Z INTERPRET    i*x c-addr u -- j*x
-;Z                      interpret given buffer
+;Z INTERPRET    i*x c-addr u -- j*x     interpret given buffer
 ; This is a common factor of EVALUATE and QUIT.
 ; ref. dpANS-6, 3.4 The Forth Text Interpreter
 ;   'SOURCE 2!  0 >IN !
@@ -1136,8 +1134,8 @@ QUIT2:  DW bran
         DW ITYPE,ABORT
 QABO1:  DW TWODROP,EXIT
 
-;C ABORT"  i*x 0  -- i*x   R: j*x -- j*x  x1=0
-;C         i*x x1 --       R: j*x --      x1<>0
+;C ABORT"  i*x 0  -- i*x | R: j*x -- j*x     x1=0
+;C ABORT"  i*x x1 -- | R: j*x --             x1<>0
 ;   POSTPONE IS" POSTPONE ?ABORT ; IMMEDIATE
     ; IMMED(ABORTQUOTE,6,"ABORT"",DOCOLON)
         DW      link
@@ -1499,7 +1497,7 @@ MOVE2:  DW EXIT
 ;        DEST(WDS1)
 ;        DW DROP,EXIT
 
-;X   WORDS    --          list all words in dict. Stop and go feature. 
+;X WORDS    --          list all words in dict. Stop and go feature. 
 ;   LATEST @ BEGIN
 ;       KEY? IF KEY DROP KEY 0x0D = IF DROP EXIT THEN THEN  
 ;       DUP HCOUNT 7F AND HTYPE SPACE
@@ -1559,17 +1557,17 @@ DOTS1:  DW II,FETCH,UDOT,lit,-2,xplusloop
 DOTS2:  DW EXIT
 
 ;mk -----------------------------------------------------------------
-;U   BELL     --                send $07 to Terminal  ;mk
+;U BELL     --                send $07 to Terminal  ;mk
      HEADER(BELL,4,"BELL",DOCOLON)
          DW lit,07h,EMIT,EXIT
 
-;Z   ESC[     --                start esc-sequence  ;mk
+;Z ESC[     --                start esc-sequence  ;mk
 ; 27 emit 91 emit ;
      HEADLESS(ESCPAR,DOCOLON)
          DW lit,27,EMIT,lit,91,EMIT
          DW EXIT
 
-;Z   PN      --                 send parameter of esc-sequence  ;mk
+;Z PN      --                 send parameter of esc-sequence  ;mk
 ; base @  swap decimal 0 u.r  base ! ; 
      HEADLESS(PN,DOCOLON)
          DW BASE,FETCH
@@ -1577,13 +1575,13 @@ DOTS2:  DW EXIT
          DW BASE,STORE
          DW EXIT
 
-;Z   ;PN    --                  send delimiter ; followed by parameter ;mk
+;Z ;PN    --                  send delimiter ; followed by parameter ;mk
 ; 59 emit pn ;
      HEADLESS(SEMIPN,DOCOLON)
          DW lit,59,EMIT,PN
          DW EXIT
 
-;U   AT-XY   x y --          set cursor position in terminal ;mk
+;U AT-XY   x y --          set cursor position in terminal ;mk
 ; 1+ swap 1+ swap ESC[ pn ;pn 72 emit ; 
      HEADER(ATXY,5,"AT-XY",DOCOLON)
          DW ONEPLUS,SWAP,ONEPLUS,SWAP
@@ -1591,7 +1589,7 @@ DOTS2:  DW EXIT
          DW SEMIPN,lit,72,EMIT
          DW EXIT
 
-;U   PAGE    --              send "page" command to terminal to clear screen. ;mk
+;U PAGE    --              send "page" command to terminal to clear screen. ;mk
 ; esc[  ." 2J" 0 0 at-xy ;
      HEADER(PAGEE,4,"PAGE",DOCOLON)
         DW ESCPAR
@@ -1611,7 +1609,7 @@ DOTS2:  DW EXIT
 ;mk \----------------------------------------------------------------
 
 ;mk -----------------------------------------------------------------
-;U   \         --      backslash  ;mk
+;U \         --      backslash  ;mk
 ; everything up to the end of the current line is a comment. 
 ;   SOURCE >IN ! DROP ; 
 ;    IMMED(BACKSLASH,1,"\",DOCOLON)   ; geht so nicht, header manuell compilieren:

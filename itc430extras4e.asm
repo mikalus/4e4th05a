@@ -60,21 +60,21 @@
 		AND		@PSP+,TOS
 		NEXT
 		
-;Z CSETB	c c-addr -- 	set bits in memory byte
+;Z CSETB   c c-addr -- 	set bits in memory byte
 		CODEHEADER(CSETB,5,"CSETB")
 		MOV		@PSP+,W
 		BIS.B	W,0(TOS)
 		MOV		@PSP+,TOS
 		NEXT
 		
-;Z CCLRB	c c-addr -- 	clear bits in memory byte
+;Z CCLRB   c c-addr -- 	clear bits in memory byte
 		CODEHEADER(CCLRB,5,"CCLRB")
 		MOV		@PSP+,W
 		BIC.B	W,0(TOS)
 		MOV		@PSP+,TOS
 		NEXT
 	
-;Z CTSTB    c c-addr -- c2	 test bits in memory byte
+;Z CTSTB   c c-addr -- c2	 test bits in memory byte
 		CODEHEADER(	CTSTB,5,"CTSTB")
 		MOV.B	@TOS,TOS
 		AND		@PSP+,TOS

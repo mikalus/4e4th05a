@@ -58,6 +58,7 @@
 ; The reset default is for all I/O pins configured as inputs,
 ; watchdog enabled, SR reset.
 
+;Z main - reset jumps to main. 
 main:   ; Debugger requires the 'main' symbol.
 reset:
         ; Watchdog Timer

@@ -34,31 +34,31 @@
 ; TI document SLAU144I - December 2004 - Revised January 2012 
 ; The digital I/O registers are listed in Table 8-2. 
 
-;S S2     -- mask port        second button mask and port address : input regster.
+;U S2     -- mask port        second button mask and port address : input regster.
 ; Switch S2 : port.pin P1.3 --->0_0----GND
     HEADER(S2,2,"S2",DOTWOCON)
       DW P1IN
       DW 00001000b
 
-;S S2?    -- f      Test button S2, true if pressed. 
+;U S2?    -- f      Test button S2, true if pressed. 
     HEADER(SQEST,3,"S2?",DOCOLON)
         DW S2,CTSTB,ZEROEQUAL,EXIT
 
-;S P1IN   -- adr    P1 input register address. 
+;U P1IN   -- adr    P1 input register address. 
     HEADER(p1in,4,"P1IN",DOCON)
       DW P1IN
 
-;S P1OUT   -- adr    P1 output register address. 
+;U P1OUT   -- adr    P1 output register address. 
     HEADER(p1out,5,"P1OUT",DOCON)
       DW P1OUT
 
-;S RED      -- mask port         red LED mask and port out address
+;U RED      -- mask port         red LED mask and port out address
 ;  P1.0 - red LED
     HEADER(RED,3,"RED",DOTWOCON)
 	  DW P1OUT
 	  DW 00000001b
 
-;S GREEN     -- mask port        green LED mask and port out address
+;U GREEN     -- mask port        green LED mask and port out address
 ;  P1.6 - green LED
     HEADER(GREEN,5,"GREEN",DOTWOCON)
       DW P1OUT

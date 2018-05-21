@@ -35,8 +35,8 @@
 .include "itc430.inc"       ; registers, macros, and header structure
 
 ; ----------------------------------------------------------------------
-; MEMORY MAP of the MSP430G2553
-; 16KB flash ROM, 0.5KB RAM
+;Z MEMORY MAP of the MSP430G2553
+;Z 16KB flash ROM, 0.5KB RAM
 ;
 ; 0000-01FF = peripherals
 ; 0200-03FF = 0.5KB RAM

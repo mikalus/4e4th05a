@@ -29,7 +29,7 @@
 ; Interrupt vectors are located in the range FFE0-FFFFh.
 
         .org 0FFE0h
-
+;Z .org FFE0h - intvecs: JSR VECAREA+index
 intvecs: DC16 VECAREA+00     ; FFE0 - not used
         DC16  VECAREA+04     ; FFE2 - not used
         DC16  VECAREA+08     ; FFE4 - IO port P1
@@ -55,7 +55,7 @@ VECS_SIZE equ 30          ; cells, 15 vectors of two cells each
 
         .org 1080h
         
-; user interrupt vectors, 15 vectors of 2 cells each
+;Z .org 1080h - VECAREA: user interrupt vectors, 15 vectors of 2 cells each
 VECAREA: 
         MOV #nullirq,PC
         MOV #nullirq,PC

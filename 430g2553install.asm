@@ -50,7 +50,7 @@
 ; HEX 1080 CONSTANT VECAREA    ( 64 bytes for 'G2553 )
 ;   ...defined in camel430g2553.asm
 
-;Z INSTALL   n -- | "word" 
+;Z INSTALL   n -- | "word"          Installs the body of the "word" as interrupt vector #n.
 ; : INSTALL ( n -- | "word" )
 ;     '               ( CFA of interrupt handler )
 ;     >BODY           ( address of interrupt handler ( -- n pfa )
