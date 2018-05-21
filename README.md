@@ -65,4 +65,4 @@ These were automatically generated from the word comments.
 ## To do
 Discard input stream if an error occurs.
 
-19 May 2018   (finis)
+(finis)
